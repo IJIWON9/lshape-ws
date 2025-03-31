@@ -55,17 +55,26 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getClusters(std::
   return clusterCloud_vector;
 }
 
+void LShapeDetect::pushClusters(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clusterCloud_vector, std::vector<std::vector<double>> dist_angle_list){
+  for (int c_idx = 0; c_idx < clusterCloud_vector.size(); c_idx++){
+    auto cluster = clusterCloud_vector.at(c_idx);
+    double dist = dist_angle_list.at(c_idx)[0];
+    double angle = dist_angle_list.at(c_idx)[1];
+    for (auto& pt : cluster->points){
+      pt.x += dist * std::cos(angle);
+      pt.y += dist * std::sin(angle);
+    }
+  }
+}
 
 std::vector<std::vector<double>> LShapeDetect::pullClusters(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clusterCloud_vector)
 {
   std::vector<std::vector<double>> dist_angle_list;
-  // cout << "11111111" << endl;
   for (int c_idx = 0; c_idx < clusterCloud_vector.size(); c_idx++){
     auto cluster = clusterCloud_vector.at(c_idx);
     double minimum_range = 999;
     int minimum_idx;
     double reference_range = 10;
-    // cout << "22222222" << endl;
     for (int i = 0; i < cluster->points.size(); i++){
       auto pt = cluster->points.at(i);
       double range = std::hypot(pt.y, pt.x);
@@ -74,17 +83,14 @@ std::vector<std::vector<double>> LShapeDetect::pullClusters(std::vector<pcl::Poi
         minimum_idx = i;
       }
     }
-    // cout << "33333" << endl;
     double angle = std::atan2(cluster->points.at(minimum_idx).y, cluster->points.at(minimum_idx).x);
     double distance = minimum_range - reference_range;
     std::vector<double> dist_angle{distance, angle};
     dist_angle_list.push_back(dist_angle);
-    // cout << "4444444" << endl;
     for (auto& pt : cluster->points){
       pt.x -= distance * std::cos(angle);
       pt.y -= distance * std::sin(angle);
     }
-    // cout << "5555555" << endl;
   }
   return dist_angle_list;
 }
@@ -95,8 +101,7 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContour(std::v
 {
   std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> contourCloud_vector;
   
-  auto dist_ang_list = pullClusters(clusterCloud_vector);
-  // cout << "666666" << endl;
+  
   for (int c_idx = 0; c_idx < clusterCloud_vector.size(); c_idx++){
     auto cluster = clusterCloud_vector.at(c_idx);
 
@@ -187,11 +192,14 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
 
   auto dbscan_obj_list = getObjectList(nonground_data, clusters);
   tc.finish("getObjectList");
-
+  
   auto clusterCloud_vector = getClusters(clusters, nonground_data);
+  
 
   tc.start("getContour");
+  auto dist_ang_list = pullClusters(clusterCloud_vector);
   auto contourCloud_vector = getContour(clusterCloud_vector, dbscan_obj_list, CONTOUR_N, CONTOUR_Z_THRH);
+  pushClusters(contourCloud_vector, dist_ang_list);
   // visualization
   for (auto& contour : contourCloud_vector)
   {
