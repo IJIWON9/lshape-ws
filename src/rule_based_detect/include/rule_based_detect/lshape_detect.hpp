@@ -321,6 +321,7 @@ public:
   double calculateLogCurvature(const std::vector<double>& p1, const std::vector<double>& p2, const std::vector<double>& p3);
   void pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
   std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> getClusters(std::vector<std::vector<uint>>& clusters, std::vector<vec3f>& nonground_data);
+  std::vector<std::vector<double>> pullClusters(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clusterCloud_vector);
   std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> getContour(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clusterCloud_vector,  
                                                                           std::vector<std::vector<double>>& dbscan_obj_list, const int contour_n, 
                                                                           const double contour_z_thresh);

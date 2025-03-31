@@ -55,12 +55,48 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getClusters(std::
   return clusterCloud_vector;
 }
 
+
+std::vector<std::vector<double>> LShapeDetect::pullClusters(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clusterCloud_vector)
+{
+  std::vector<std::vector<double>> dist_angle_list;
+  // cout << "11111111" << endl;
+  for (int c_idx = 0; c_idx < clusterCloud_vector.size(); c_idx++){
+    auto cluster = clusterCloud_vector.at(c_idx);
+    double minimum_range = 999;
+    int minimum_idx;
+    double reference_range = 10;
+    // cout << "22222222" << endl;
+    for (int i = 0; i < cluster->points.size(); i++){
+      auto pt = cluster->points.at(i);
+      double range = std::hypot(pt.y, pt.x);
+      if (range < minimum_range){
+        minimum_range = range;
+        minimum_idx = i;
+      }
+    }
+    // cout << "33333" << endl;
+    double angle = std::atan2(cluster->points.at(minimum_idx).y, cluster->points.at(minimum_idx).x);
+    double distance = minimum_range - reference_range;
+    std::vector<double> dist_angle{distance, angle};
+    dist_angle_list.push_back(dist_angle);
+    // cout << "4444444" << endl;
+    for (auto& pt : cluster->points){
+      pt.x -= distance * std::cos(angle);
+      pt.y -= distance * std::sin(angle);
+    }
+    // cout << "5555555" << endl;
+  }
+  return dist_angle_list;
+}
+
 std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContour(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clusterCloud_vector, 
                                                                           std::vector<std::vector<double>>& dbscan_obj_list, const int contour_n, 
                                                                           const double contour_z_thresh)
 {
   std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> contourCloud_vector;
-
+  
+  auto dist_ang_list = pullClusters(clusterCloud_vector);
+  // cout << "666666" << endl;
   for (int c_idx = 0; c_idx < clusterCloud_vector.size(); c_idx++){
     auto cluster = clusterCloud_vector.at(c_idx);
 
