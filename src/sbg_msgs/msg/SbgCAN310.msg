@@ -1,0 +1,3 @@
+float64 latitude_acc
+float64 longitude_acc
+float64 altitude_acc

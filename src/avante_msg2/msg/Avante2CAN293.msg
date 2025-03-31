@@ -1,0 +1,2 @@
+float64 pitzone_lat
+float64 pitzone_long

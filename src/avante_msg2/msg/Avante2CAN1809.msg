@@ -1,0 +1,13 @@
+string acc_en_status
+string acc_control_board_status
+string acc_control_status
+string acc_user_can_err
+string acc_err
+uint8 vs
+float64 long_accel
+string hazard_en
+string turn_left_en
+string turn_right_en
+string acc_veh_err
+string g_sel_disp
+uint8 acc_alive_cnt

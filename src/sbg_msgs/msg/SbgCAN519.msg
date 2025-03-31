@@ -1,0 +1,4 @@
+uint16 time_offset_0
+uint16 time_offset_1
+uint16 time_offset_2
+uint16 time_offset_3

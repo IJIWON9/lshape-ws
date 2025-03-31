@@ -1,0 +1,7 @@
+<launch>
+ <rosparam command="load" file="$(find save_parameter)/config.yaml" />
+ <param name="/use_sim_time" value="false"/>
+
+ <node pkg="save_CAN_interface" type="mainCAN_kv.py" name="kvCAN" output="screen" />
+
+</launch>

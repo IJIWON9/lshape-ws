@@ -1,0 +1,9 @@
+bool eps_en
+bool override_ignore
+uint8 eps_speed
+bool acc_en
+bool aeb_en
+uint8 gear_change
+uint8 turn_sig_en
+float32 aeb_decel_value
+uint8 aliv_cnt

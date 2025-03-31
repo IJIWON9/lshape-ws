@@ -1,0 +1,13 @@
+# Request
+int16 direction
+float64 distance1
+float64 distance2
+float64 distance3
+---
+# Response
+float64[] path1_x
+float64[] path1_y
+float64[] path2_x
+float64[] path2_y
+float64[] path3_x
+float64[] path3_y

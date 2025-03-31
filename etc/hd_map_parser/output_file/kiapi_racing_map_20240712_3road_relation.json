@@ -1,0 +1,477 @@
+{
+    "name": "kiapi_racing_map_20240712_3",
+    "roads": [
+        {
+            "road": "R1",
+            "road_id": 1,
+            "road_length": 503.5,
+            "lane": [
+                "1",
+                "2",
+                "3"
+            ],
+            "lane_id": [
+                1,
+                2,
+                3
+            ],
+            "connection": []
+        },
+        {
+            "road": "R2",
+            "road_id": 2,
+            "road_length": 131.5,
+            "lane": [
+                "1",
+                "2",
+                "3"
+            ],
+            "lane_id": [
+                4,
+                5,
+                6
+            ],
+            "connection": []
+        },
+        {
+            "road": "R3",
+            "road_id": 3,
+            "road_length": 902.0,
+            "lane": [
+                "1",
+                "2",
+                "3"
+            ],
+            "lane_id": [
+                7,
+                8,
+                9
+            ],
+            "connection": []
+        },
+        {
+            "road": "R4",
+            "road_id": 4,
+            "road_length": 134.5,
+            "lane": [
+                "1",
+                "3",
+                "2"
+            ],
+            "lane_id": [
+                10,
+                11,
+                12
+            ],
+            "connection": []
+        },
+        {
+            "road": "R5",
+            "road_id": 5,
+            "road_length": 160.5,
+            "lane": [
+                "1",
+                "3",
+                "2"
+            ],
+            "lane_id": [
+                13,
+                14,
+                15
+            ],
+            "connection": []
+        },
+        {
+            "road": "R6",
+            "road_id": 6,
+            "road_length": 100.0,
+            "lane": [
+                "1",
+                "3",
+                "2"
+            ],
+            "lane_id": [
+                16,
+                17,
+                18
+            ],
+            "connection": []
+        },
+        {
+            "road": "R7",
+            "road_id": 7,
+            "road_length": 123.0,
+            "lane": [
+                "1",
+                "2",
+                "3"
+            ],
+            "lane_id": [
+                19,
+                20,
+                21
+            ],
+            "connection": []
+        },
+        {
+            "road": "R8",
+            "road_id": 8,
+            "road_length": 60.5,
+            "lane": [
+                "1",
+                "3",
+                "2"
+            ],
+            "lane_id": [
+                22,
+                23,
+                24
+            ],
+            "connection": []
+        },
+        {
+            "road": "R9",
+            "road_id": 9,
+            "road_length": 44.0,
+            "lane": [
+                "1",
+                "3",
+                "2"
+            ],
+            "lane_id": [
+                25,
+                26,
+                27
+            ],
+            "connection": []
+        },
+        {
+            "road": "R10",
+            "road_id": 10,
+            "road_length": 53.5,
+            "lane": [
+                "2",
+                "1",
+                "3"
+            ],
+            "lane_id": [
+                28,
+                29,
+                30
+            ],
+            "connection": []
+        },
+        {
+            "road": "R11",
+            "road_id": 11,
+            "road_length": 38.0,
+            "lane": [
+                "3",
+                "1",
+                "2"
+            ],
+            "lane_id": [
+                31,
+                32,
+                33
+            ],
+            "connection": []
+        },
+        {
+            "road": "R12",
+            "road_id": 12,
+            "road_length": 162.5,
+            "lane": [
+                "2",
+                "3",
+                "1"
+            ],
+            "lane_id": [
+                34,
+                35,
+                36
+            ],
+            "connection": []
+        },
+        {
+            "road": "R13",
+            "road_id": 13,
+            "road_length": 169.5,
+            "lane": [
+                "3",
+                "1",
+                "2"
+            ],
+            "lane_id": [
+                37,
+                38,
+                39
+            ],
+            "connection": []
+        },
+        {
+            "road": "R14",
+            "road_id": 14,
+            "road_length": 27.0,
+            "lane": [
+                "2",
+                "1",
+                "3"
+            ],
+            "lane_id": [
+                40,
+                41,
+                42
+            ],
+            "connection": []
+        },
+        {
+            "road": "R15",
+            "road_id": 15,
+            "road_length": 4.5,
+            "lane": [
+                "3",
+                "1",
+                "2"
+            ],
+            "lane_id": [
+                43,
+                44,
+                45
+            ],
+            "connection": []
+        },
+        {
+            "road": "R16",
+            "road_id": 16,
+            "road_length": 39.5,
+            "lane": [
+                "2",
+                "1",
+                "3"
+            ],
+            "lane_id": [
+                46,
+                47,
+                48
+            ],
+            "connection": []
+        },
+        {
+            "road": "R17",
+            "road_id": 17,
+            "road_length": 11.5,
+            "lane": [
+                "1",
+                "4",
+                "2",
+                "3",
+                "5",
+                "6"
+            ],
+            "lane_id": [
+                49,
+                50,
+                51,
+                52,
+                53,
+                54
+            ],
+            "connection": []
+        },
+        {
+            "road": "R18",
+            "road_id": 18,
+            "road_length": 27.0,
+            "lane": [
+                "3",
+                "2",
+                "5",
+                "1",
+                "4"
+            ],
+            "lane_id": [
+                55,
+                56,
+                57,
+                58,
+                59
+            ],
+            "connection": []
+        },
+        {
+            "road": "R19",
+            "road_id": 19,
+            "road_length": 86.0,
+            "lane": [
+                "3",
+                "2",
+                "1"
+            ],
+            "lane_id": [
+                60,
+                61,
+                62
+            ],
+            "connection": []
+        },
+        {
+            "road": "R20",
+            "road_id": 20,
+            "road_length": 42.0,
+            "lane": [
+                "3",
+                "2",
+                "1"
+            ],
+            "lane_id": [
+                63,
+                64,
+                65
+            ],
+            "connection": []
+        },
+        {
+            "road": "R21",
+            "road_id": 21,
+            "road_length": 161.5,
+            "lane": [
+                "3",
+                "2",
+                "1"
+            ],
+            "lane_id": [
+                66,
+                67,
+                68
+            ],
+            "connection": []
+        },
+        {
+            "road": "R22",
+            "road_id": 22,
+            "road_length": 375.5,
+            "lane": [
+                "3",
+                "1",
+                "2"
+            ],
+            "lane_id": [
+                69,
+                70,
+                71
+            ],
+            "connection": []
+        },
+        {
+            "road": "R23",
+            "road_id": 23,
+            "road_length": 420.0,
+            "lane": [
+                "2",
+                "3",
+                "1"
+            ],
+            "lane_id": [
+                72,
+                73,
+                74
+            ],
+            "connection": []
+        },
+        {
+            "road": "R24",
+            "road_id": 24,
+            "road_length": 35.5,
+            "lane": [
+                "4",
+                "2",
+                "3",
+                "1"
+            ],
+            "lane_id": [
+                75,
+                76,
+                77,
+                78
+            ],
+            "connection": []
+        },
+        {
+            "road": "R25",
+            "road_id": 25,
+            "road_length": 21.5,
+            "lane": [
+                "3",
+                "2",
+                "1"
+            ],
+            "lane_id": [
+                79,
+                80,
+                81
+            ],
+            "connection": []
+        },
+        {
+            "road": "R26",
+            "road_id": 26,
+            "road_length": 214.5,
+            "lane": [
+                "1",
+                "3",
+                "2"
+            ],
+            "lane_id": [
+                82,
+                83,
+                84
+            ],
+            "connection": []
+        },
+        {
+            "road": "R27",
+            "road_id": 27,
+            "road_length": 46.5,
+            "lane": [
+                "2",
+                "3",
+                "1"
+            ],
+            "lane_id": [
+                85,
+                86,
+                87
+            ],
+            "connection": []
+        },
+        {
+            "road": "R28",
+            "road_id": 28,
+            "road_length": 46.0,
+            "lane": [
+                "1"
+            ],
+            "lane_id": [
+                88
+            ],
+            "connection": []
+        },
+        {
+            "road": "R29",
+            "road_id": 29,
+            "road_length": 44.5,
+            "lane": [
+                "2",
+                "1",
+                "3"
+            ],
+            "lane_id": [
+                89,
+                90,
+                91
+            ],
+            "connection": []
+        }
+    ]
+}

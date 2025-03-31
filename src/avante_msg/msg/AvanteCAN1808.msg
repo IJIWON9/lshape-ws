@@ -1,0 +1,13 @@
+string eps_en_status
+string eps_control_board_status
+string eps_user_can_err
+string eps_err
+string eps_veh_can_err
+string eps_sas_err
+string eps_control_status
+string override_ignore_status
+string override_status
+float32 strang
+float32 str_drv_tq
+float32 str_out_tq
+uint8 eps_alive_cnt

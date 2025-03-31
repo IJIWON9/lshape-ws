@@ -1,0 +1,3 @@
+uint32 time_stamp
+uint16 general_status
+uint16 clock_status

@@ -1,0 +1,4 @@
+float64 angle_track
+float64 angle_slip
+float64 curvature_radius
+uint8 auto_status

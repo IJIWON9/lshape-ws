@@ -1,0 +1,4 @@
+uint8 rad_objstate
+float32 rad_objlatpos
+uint8 rad_objdist
+float32 rad_objrelspd

@@ -1,0 +1,3 @@
+uint32 time_stamp
+uint8 air_data_status
+float64 air_temperature

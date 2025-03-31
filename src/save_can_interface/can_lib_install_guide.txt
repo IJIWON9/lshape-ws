@@ -1,0 +1,49 @@
+1. pycanlib
+	# 참고 링크 :  https://pypi.org/project/canlib/
+	# 받으면 docs 안에 유용한 documentation html 파일 있음
+	
+	1) kvaser download page 접속 (https://www.kvaser.com/download/)
+	2) 우측 below 검색창에  pycanlib  검색 후 pycanlib.zip 다운로드
+	3) 압축 풀기 (더블클릭 후 Extract)
+	4) 받은 디렉토리에서 터미널 열어서 $ pip3 install canlib-x.y.z-py2.py3-none-any.whl (x, y, z 는 버전)
+	
+
+2. kvaser driver & sdk
+	# 참고 링크 : https://www.youtube.com/watch?v=Gz-lIVIU7ys
+	
+	 !!!!- 드라이버 설치 전 kvaser usb 선 연결하지말고, bios에서 secure boot disable 할 것 !!!!
+	1) kvaser download page 접속 (https://www.kvaser.com/download/)
+	2) 우측 검색창에 linuxcan 검색해서 linuxcan.tar.gz 다운로드
+	3) 받은 디렉토리에서 터미널 열어서 $ tar -xvzf linuxcan.tar.gz
+	4)  $ sudo apt-get install build-essential
+	5)  $ sudo apt-get install linux-headers-`uname -r`
+	6)  $ cd linuxcan
+	7)  $ make
+	8)  $ sudo make install
+	9)  $ cd canlib                 (/linuxcan/canlib)
+	10) $ make
+	11) $ sudo make install
+	12) $ cd ../common              (/linuxcan/common)
+	13) $ make
+	14) $ sudo ./installscript.sh
+	15) $ cd ..                     (/linuxcan)
+	16) $ make KV_Debug_ON=1
+	# 잘 깔렸는지 확인 : $ cd canlib/examples
+			    $ ./listChannels       -> 터미널에 1 Channel found 프린트 되면 성공
+			    
+			    
+3. kvadblib
+	# 참고 링크 : https://www.kvaser.com/canlib-webhelp/section_install_linux.html
+
+	1) $ wget --content-disposition "https://www.kvaser.com/downloads-kvaser/?utm_source=software&utm_ean=7330130981966&utm_status=latest"
+	2) $ tar xvzf kvlibsdk.tar.gz
+	3) $ cd kvlibsdk
+	4) $ make
+	5) $ make check
+	6) $ sudo make install
+	
+
+4. cantools
+	# 참고 링크 : https://pypi.org/project/cantools/
+	
+	1) $ pip3 install cantools

@@ -1,0 +1,2 @@
+uint32 solution_status
+uint16 heave_status

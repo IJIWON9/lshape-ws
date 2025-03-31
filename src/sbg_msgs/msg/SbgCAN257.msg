@@ -1,0 +1,2 @@
+uint32 com_status
+uint32 aiding_status
