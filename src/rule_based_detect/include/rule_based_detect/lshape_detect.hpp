@@ -331,6 +331,9 @@ public:
   std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> getContour(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clusterCloud_vector,  
                                                                           std::vector<std::vector<double>>& dbscan_obj_list, const int contour_n, 
                                                                           const double contour_z_thresh);
+
+  std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> getContourV2(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clusterCloud_vector, std::vector<std::vector<double>>& dbscan_obj_list, 
+                                                                          const double contour_res, const double contour_z_thresh);
                                                                   
   
   
@@ -505,7 +508,7 @@ public:
   int N_RANGE = int((MAX_RANGE - MIN_RANGE) / RANGE_RESOLUTION) + 1;  
 
   int CONTOUR_N = 720;
-  int CONTOUR_RES = M_PI * 2 / CONTOUR_N;
+  double CONTOUR_RES = 0.5;
   double CONTOUR_Z_THRH = 0.5;
 
   Eigen::Isometry3d lidarPose, currPose;
@@ -529,14 +532,8 @@ private:
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr nongroundCloud_pub;
   rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr line_pub;
 
-  std::vector<double> get_unit_vector(double x, double y)
-  {
-    double magnitude = std::sqrt(x*x + y*y);
-    std::vector<double> vec = {x / magnitude, y / magnitude};
-    return vec;
-  }
 
-  double larger_angle_singlewise(double theta1, double theta2)    //radian  // object angle over 180 error
+  double larger_angle_singlewise(double theta1, double theta2)   
   {
     double diff = fmod(theta2 - theta1, 2 * M_PI);
 
