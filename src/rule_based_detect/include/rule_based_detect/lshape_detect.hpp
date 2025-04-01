@@ -34,6 +34,8 @@
 #include <pcl/segmentation/sac_segmentation.h>
 #include <pcl/segmentation/extract_clusters.h>
 
+#include <opencv2/opencv.hpp>
+
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
 #include <unsupported/Eigen/CXX11/Tensor>
@@ -542,6 +544,68 @@ private:
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr nongroundCloud_pub;
   rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr line_pub;
 
+  double computeClosedAreaFromPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, bool show_debug = false) {
+    if (cloud->empty()) return 0.0;
+
+    // 1. PointCloud의 XY 범위 계산
+    float min_x = std::numeric_limits<float>::max();
+    float min_y = std::numeric_limits<float>::max();
+    float max_x = -std::numeric_limits<float>::max();
+    float max_y = -std::numeric_limits<float>::max();
+
+    for (const auto& pt : cloud->points) {
+        min_x = std::min(min_x, pt.x);
+        min_y = std::min(min_y, pt.y);
+        max_x = std::max(max_x, pt.x);
+        max_y = std::max(max_y, pt.y);
+    }
+
+    // 2. 이미지 크기 및 초기화
+    const int imageSize = 256;
+    cv::Mat img = cv::Mat::zeros(imageSize, imageSize, CV_8UC1);
+
+    // 3. 포인트들을 이미지에 그리기 (2x2 픽셀 블록으로)
+    for (const auto& pt : cloud->points) {
+        int x = static_cast<int>(((pt.x - min_x) / (max_x - min_x)) * (imageSize - 1));
+        int y = static_cast<int>(((pt.y - min_y) / (max_y - min_y)) * (imageSize - 1));
+
+        // 이미지 좌표계는 y가 아래로 증가하므로 보정 필요
+        int row = imageSize - y - 1;
+        int col = x;
+
+        if (row >= 1 && row < imageSize - 1 && col >= 1 && col < imageSize - 1) {
+            cv::rectangle(img, cv::Point(col - 1, row - 1), cv::Point(col + 1, row + 1), 255, cv::FILLED);
+        }
+    }
+
+    // 디버그용 이미지 확인
+    if (show_debug) {
+        cv::imshow("PointCloud Image", img);
+        cv::waitKey(0);
+    }
+
+    // 4. Contour 추출
+    std::vector<std::vector<cv::Point>> contours;
+    cv::findContours(img, contours, cv::RETR_LIST, cv::CHAIN_APPROX_SIMPLE);
+
+    // 5. 각 contour 넓이 계산
+    double total_area_px = 0.0;
+    for (const auto& contour : contours) {
+        double area = cv::contourArea(contour);
+        if (area > 1.0) {  // 너무 작은 contour는 무시
+            total_area_px += area;
+        }
+    }
+
+    // 6. 넓이 환산: 전체 실제 크기에 비례한 비율 계산
+    double range_x = max_x - min_x;
+    double range_y = max_y - min_y;
+    double pixel_size_x = range_x / imageSize;
+    double pixel_size_y = range_y / imageSize;
+    double pixel_area_m2 = pixel_size_x * pixel_size_y;
+
+    return total_area_px;  // 실제 면적 (m^2)
+  }
 
   double larger_angle_singlewise(double theta1, double theta2)   
   {

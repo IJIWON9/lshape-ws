@@ -297,7 +297,8 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContourV2(std:
     //   }
     // }
     // cout << endl;
-
+    double area = computeClosedAreaFromPointCloud(filtered);
+    cout << "area " << area << endl;
 
     contourCloud_vector.push_back(filtered);
   }
@@ -352,6 +353,8 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContour(std::v
 
     }
     
+    
+    
     contourCloud_vector.push_back(obj_contour);
   }
 
@@ -400,15 +403,14 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
   cluster_cloud_msg.header.frame_id = frame_id_lidar;
   cluster_cloud_msg.header.stamp = this->get_clock()->now();
   clustercloud_pub->publish(cluster_cloud_msg);
-
   auto dbscan_obj_list = getObjectList(nonground_data, clusters, md_type);
   tc.finish("getObjectList");
   auto clusterCloud_vector = getClusters(clusters, nonground_data);
-
+  
   tc.start("getContour");
   auto dist_ang_list = pullClusters(clusterCloud_vector);
   // auto contourCloud_vector = getContour(clusterCloud_vector, dbscan_obj_list, CONTOUR_N, CONTOUR_Z_THRH);
-
+  
   auto contourCloud_vector = getContourV2(clusterCloud_vector, dbscan_obj_list, CONTOUR_RES, CONTOUR_Z_THRH, dist_ang_list);
   // pushClusters(contourCloud_vector, dist_ang_list);
   
