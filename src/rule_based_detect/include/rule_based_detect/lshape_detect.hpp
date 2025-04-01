@@ -334,7 +334,16 @@ public:
 
   std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> getContourV2(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clusterCloud_vector, std::vector<std::vector<double>>& dbscan_obj_list, 
                                                                           const double contour_res, const double contour_z_thresh);
-                                                                  
+
+  pcl::PointCloud<pcl::PointXYZ>::Ptr removeOutlier(pcl::PointCloud<pcl::PointXYZ>::Ptr obj_contour, 
+                                                    double max_distance, std::vector<int>& contour_pt_idx,
+                                                    double min_angle, double max_angle, double contour_res);
+
+  void interpolateContour(pcl::PointCloud<pcl::PointXYZ>::Ptr filtered, pcl::PointCloud<pcl::PointXYZ>::Ptr cluster, 
+                            int contour_n, std::vector<int>& contour_pt_idx, double average_z);
+
+  std::vector<int> sortByAngle(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud, double contour_res,int contour_n, double min_angle, double max_angle);
+
   
   
 
@@ -515,8 +524,8 @@ public:
 
    
 
-  uint DBSCAN_PTS = 3;
-  const float DBSCAN_EPS = 1.0;
+  uint DBSCAN_PTS = 5;
+  const float DBSCAN_EPS = 1.3;
   const std::string frame_id_lidar = "os1_frame";
 
   PointMatrices mat_of_PC;
