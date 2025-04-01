@@ -1,0 +1,3 @@
+lshape_detect:
+  ros__parameters:
+    my_param: 123

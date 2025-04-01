@@ -333,7 +333,7 @@ public:
                                                                           const double contour_z_thresh);
 
   std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> getContourV2(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clusterCloud_vector, std::vector<std::vector<double>>& dbscan_obj_list, 
-                                                                          const double contour_res, const double contour_z_thresh);
+                                                                          const double contour_res, const double contour_z_thresh, std::vector<std::vector<double>>& dist_angle_list);
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr removeOutlier(pcl::PointCloud<pcl::PointXYZ>::Ptr obj_contour, 
                                                     double max_distance, std::vector<int>& contour_pt_idx,
@@ -342,7 +342,7 @@ public:
   void interpolateContour(pcl::PointCloud<pcl::PointXYZ>::Ptr filtered, pcl::PointCloud<pcl::PointXYZ>::Ptr cluster, 
                             int contour_n, std::vector<int>& contour_pt_idx, double average_z);
 
-  std::vector<int> sortByAngle(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud, double contour_res,int contour_n, double min_angle, double max_angle);
+  std::vector<int> sortByAngle(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud, double contour_res);
 
   
   
@@ -498,6 +498,7 @@ public:
   const std::string LANE_1_FILE_PATH = pkg_share_dir + LOCAL_LANE_1_FILE_PATH;
   const std::string LANE_2_FILE_PATH = pkg_share_dir + LOCAL_LANE_2_FILE_PATH;
   const std::string LANE_3_FILE_PATH = pkg_share_dir + LOCAL_LANE_3_FILE_PATH;
+  
 
   const int csv_index_x = 0;
   const int csv_index_y = 1;
@@ -524,8 +525,8 @@ public:
 
    
 
-  uint DBSCAN_PTS = 5;
-  const float DBSCAN_EPS = 1.3;
+  uint DBSCAN_PTS = 4;
+  const float DBSCAN_EPS = 1.5;
   const std::string frame_id_lidar = "os1_frame";
 
   PointMatrices mat_of_PC;
@@ -809,10 +810,10 @@ private:
       }
     } else if (mapdata_type == 1){
       // for RECTANGLE //
-      double rec_half_w = 10.0;
-      double rec_forward = 25.0;
-      double rec_backward = 3.0;
-      double rec_weight = 3.0;
+      double rec_half_w = 30.0;
+      double rec_forward = 100.0;
+      double rec_backward = 1.0;
+      double rec_weight = 1.0;
       pcl::PointXYZ pp1;        
       pp1.x = rec_forward * rec_weight;
       pp1.y = rec_half_w * rec_weight;
@@ -1037,7 +1038,7 @@ private:
     return clusters;
   }
 
-  std::vector<std::vector<double>> getObjectList(std::vector<vec3f> &data, std::vector<std::vector<uint>> &clusters)
+  std::vector<std::vector<double>> getObjectList(std::vector<vec3f> &data, std::vector<std::vector<uint>> &clusters, int mapdata_type)
   {
     std::vector<std::vector<double>> dbscan_obj_list;
     std::vector<int> removed_indices;
@@ -1073,15 +1074,17 @@ private:
       }
 
       std::vector<double> object = {sum_x/cluster.size(), sum_y/cluster.size(), sum_z/cluster.size()};
-
-      double nearest_distance2border = get_nearest_border_distance_v2(local_border_1m, object, ymin_pt, ymax_pt);
-
-      if (nearest_distance2border < THRESHOLD_DISTANCE2BORDER)
-      {
-        removed_indices.push_back(c_idx);
-        continue;
-      }
+      
+      if (mapdata_type == 0){
+        double nearest_distance2border = get_nearest_border_distance_v2(local_border_1m, object, ymin_pt, ymax_pt);
+        if (nearest_distance2border < THRESHOLD_DISTANCE2BORDER)
+        {
+          removed_indices.push_back(c_idx);
+          continue;
+        }
+          
         
+      }
       dbscan_obj_list.push_back(object);
     }
 

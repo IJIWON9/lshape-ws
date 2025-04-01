@@ -115,7 +115,7 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr LShapeDetect::removeOutlier(pcl::PointCloud<
       if (dist < max_distance) {
         filtered->points.push_back(curr);
       } else {
-
+        // cout << "deleted 1st " << dist << endl;
         contour_pt_idx[0] = -1;
       }
       continue;
@@ -126,6 +126,7 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr LShapeDetect::removeOutlier(pcl::PointCloud<
       if (dist < max_distance) {
         filtered->points.push_back(curr);
       } else {
+        // cout << "deleted last " << dist << endl;
         contour_pt_idx[contour_pt_idx.size() - 1] = -1;
       }
       continue;
@@ -140,6 +141,7 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr LShapeDetect::removeOutlier(pcl::PointCloud<
     if (dist1 < max_distance && dist2 < max_distance) {
       filtered->points.push_back(curr);
     } else {
+      // cout << "deleted : " << dist1 << " " << dist2 << endl;
       contour_pt_idx[angle_idx] = -1;
     }
   }
@@ -184,12 +186,25 @@ void LShapeDetect::interpolateContour(pcl::PointCloud<pcl::PointXYZ>::Ptr filter
         interp_point.z = average_z;
 
         filtered->points.push_back(interp_point);
+        contour_pt_idx[id] = 9999;
       }
     }
   }
 }
-std::vector<int> LShapeDetect::sortByAngle(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud, double contour_res, int contour_n, double min_angle, double max_angle)
+std::vector<int> LShapeDetect::sortByAngle(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud, double contour_res)
 {
+  double max_angle = std::atan2(input_cloud->points.at(0).y, input_cloud->points.at(0).x);
+  double min_angle = std::atan2(input_cloud->points.at(0).y, input_cloud->points.at(0).x);
+  for (int idx = 0; idx < input_cloud->points.size(); idx++){
+    auto pt = input_cloud->points.at(idx);
+    double angle = std::atan2(pt.y, pt.x);
+    max_angle = (larger_angle_singlewise(angle, max_angle) == angle) ? angle : max_angle;
+    min_angle = (larger_angle_singlewise(angle, min_angle) == angle) ? min_angle : angle;
+  }
+  double min = std::round(min_angle * (180 / M_PI) / contour_res);
+  double max = std::round(max_angle * (180 / M_PI) / contour_res);
+  int contour_n = (max - min > 0) ? static_cast<int>(max - min + 1) : static_cast<int>(max - min + 720 + 1);
+
   std::vector<int> sorted_contour_idx(contour_n, -1);
   for (int idx = 0; idx < input_cloud->points.size(); idx++){
     auto pt = input_cloud->points.at(idx);
@@ -202,14 +217,18 @@ std::vector<int> LShapeDetect::sortByAngle(pcl::PointCloud<pcl::PointXYZ>::Ptr i
       continue;
     sorted_contour_idx[angle_idx] = idx;
   }
+  
+
   return sorted_contour_idx;
 }
 
-std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContourV2(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clusterCloud_vector, std::vector<std::vector<double>>& dbscan_obj_list, const double contour_res, const double contour_z_thresh)
+std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContourV2(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clusterCloud_vector, std::vector<std::vector<double>>& dbscan_obj_list, 
+                                                                            const double contour_res, const double contour_z_thresh, std::vector<std::vector<double>>& dist_angle_list)
 {
   std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> contourCloud_vector;
   for (int c_idx = 0; c_idx < clusterCloud_vector.size(); c_idx++){
     auto cluster = clusterCloud_vector.at(c_idx);
+
     double max_angle = std::atan2(cluster->points.at(0).y, cluster->points.at(0).x);
     double min_angle = std::atan2(cluster->points.at(0).y, cluster->points.at(0).x);
     for (int idx = 0; idx < cluster->points.size(); idx++){
@@ -218,6 +237,7 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContourV2(std:
       max_angle = (larger_angle_singlewise(angle, max_angle) == angle) ? angle : max_angle;
       min_angle = (larger_angle_singlewise(angle, min_angle) == angle) ? min_angle : angle;
     }
+
     double min = std::round(min_angle * (180 / M_PI) / contour_res);
     double max = std::round(max_angle * (180 / M_PI) / contour_res);
     int contour_n = (max - min > 0) ? static_cast<int>(max - min + 1) : static_cast<int>(max - min + 720 + 2);
@@ -225,20 +245,22 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContourV2(std:
     std::vector<int> contour_pt_idx(contour_n, -1);
     std::vector<int> contour_angle_check(contour_n, 0);
     std::vector<double> contour_range_check(contour_n, 0);
-
     for (int idx = 0; idx < cluster->points.size(); idx++){
       auto pt = cluster->points.at(idx);
+
       if (std::abs(pt.z - dbscan_obj_list[c_idx][2]) > contour_z_thresh)
           continue;
       double range = std::hypot(pt.y, pt.x);
       double angle = (max_angle - min_angle > 0) ? std::atan2(pt.y, pt.x) : ((std::atan2(pt.y, pt.x) < 0) ? std::atan2(pt.y, pt.x) + 2 * M_PI : std::atan2(pt.y, pt.x));
       double angle_deg = angle * (180 / M_PI);
       double min_angle_deg = min_angle * (180 / M_PI);
+
       
       double rel_angle = angle_deg - min_angle_deg;
       int angle_idx = static_cast<int>(std::round(rel_angle / contour_res));
       if (angle_idx >= contour_n)
         continue;
+
       
       if (contour_angle_check[angle_idx] == 1 && range > contour_range_check[angle_idx])
         continue;
@@ -261,17 +283,25 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContourV2(std:
 
       } 
     }
-
-    double max_dist = 0.5;
+    double max_dist = 1.0;
     auto filtered = removeOutlier(obj_contour, max_dist, contour_pt_idx, min_angle, max_angle, contour_res);
     interpolateContour(filtered, cluster, contour_n, contour_pt_idx, dbscan_obj_list[c_idx][2]);
 
+
     // smoothing
+    // for (int i = 0; i < contour_pt_idx.size(); i++){
+    //   if (contour_pt_idx[i] != -1){
+    //     cout << i << " ";
+    //   } else if (contour_pt_idx[i] == 9999){
+    //     cout << contour_pt_idx[i] << " ";
+    //   }
+    // }
+    // cout << endl;
 
 
     contourCloud_vector.push_back(filtered);
   }
-  cout << contourCloud_vector.size() << endl;
+  // cout << "contours : " << contourCloud_vector.size() << endl;
   return contourCloud_vector;
 }
 
@@ -281,10 +311,8 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContour(std::v
 {
   std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> contourCloud_vector;
   
-  
   for (int c_idx = 0; c_idx < clusterCloud_vector.size(); c_idx++){
     auto cluster = clusterCloud_vector.at(c_idx);
-
     std::vector<int> contour_angle_check(contour_n, 0);
     std::vector<double> contour_range_check(contour_n, 0);
     std::vector<int> contour_pt_idx(contour_n, -1);
@@ -311,7 +339,6 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContour(std::v
       contour_pt_idx[contour_idx] = idx;
       
     }
-
     for (int id = 0; id < contour_pt_idx.size(); id++)
     {
       if (contour_pt_idx[id] == -1)
@@ -324,7 +351,7 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContour(std::v
       obj_contour->points.push_back(contour_point);
 
     }
-
+    
     contourCloud_vector.push_back(obj_contour);
   }
 
@@ -335,9 +362,11 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
 
   TimeChecker tc(false);
   tc.start("total");
-  int md_type = 0;
-  generate_mapdata_pointcloud();    
+  int md_type = 1;
+  if (md_type == 0)
+    generate_mapdata_pointcloud();   
   assemble_mapdata(md_type); 
+
 
   rawCloud->clear();
   nongroundCloud->clear();
@@ -348,6 +377,7 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
   init_matrices(mat_of_PC);
   select_roi(rawCloud, mat_of_PC);  
   ground_removal(rawCloud, nongroundCloud, mat_of_PC);
+
   sensor_msgs::msg::PointCloud2 nongroundCloud_msg;
   pcl::toROSMsg(*nongroundCloud, nongroundCloud_msg);
   nongroundCloud_msg.header.frame_id = frame_id_lidar;
@@ -356,6 +386,8 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
   tc.finish("ground_removal");
 
   tc.start("getObjectList");
+  
+
 
   std::vector<vec3f> nonground_data;
   for (auto& pt : nongroundCloud->points)
@@ -363,27 +395,24 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
     nonground_data.push_back(vec3f{pt.x, pt.y, pt.z});
   }
   auto clusters = dbscan_clustering(nonground_data, clusterCloud);
-
   sensor_msgs::msg::PointCloud2 cluster_cloud_msg;
   pcl::toROSMsg(*clusterCloud, cluster_cloud_msg);
   cluster_cloud_msg.header.frame_id = frame_id_lidar;
   cluster_cloud_msg.header.stamp = this->get_clock()->now();
   clustercloud_pub->publish(cluster_cloud_msg);
 
-  auto dbscan_obj_list = getObjectList(nonground_data, clusters);
+  auto dbscan_obj_list = getObjectList(nonground_data, clusters, md_type);
   tc.finish("getObjectList");
-  
   auto clusterCloud_vector = getClusters(clusters, nonground_data);
-  
 
   tc.start("getContour");
   auto dist_ang_list = pullClusters(clusterCloud_vector);
   // auto contourCloud_vector = getContour(clusterCloud_vector, dbscan_obj_list, CONTOUR_N, CONTOUR_Z_THRH);
-  auto contourCloud_vector = getContourV2(clusterCloud_vector, dbscan_obj_list, CONTOUR_RES, CONTOUR_Z_THRH);
-  pushClusters(contourCloud_vector, dist_ang_list);
 
+  auto contourCloud_vector = getContourV2(clusterCloud_vector, dbscan_obj_list, CONTOUR_RES, CONTOUR_Z_THRH, dist_ang_list);
+  // pushClusters(contourCloud_vector, dist_ang_list);
   
-
+  
 
   // visualization
   for (auto& contour : contourCloud_vector)
