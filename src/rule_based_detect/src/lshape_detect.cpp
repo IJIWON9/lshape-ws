@@ -191,35 +191,65 @@ void LShapeDetect::interpolateContour(pcl::PointCloud<pcl::PointXYZ>::Ptr filter
     }
   }
 }
-std::vector<int> LShapeDetect::sortByAngle(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud, double contour_res)
+pcl::PointCloud<pcl::PointXYZ>::Ptr LShapeDetect::isSymmetric(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud)
 {
-  double max_angle = std::atan2(input_cloud->points.at(0).y, input_cloud->points.at(0).x);
-  double min_angle = std::atan2(input_cloud->points.at(0).y, input_cloud->points.at(0).x);
-  for (int idx = 0; idx < input_cloud->points.size(); idx++){
-    auto pt = input_cloud->points.at(idx);
-    double angle = std::atan2(pt.y, pt.x);
-    max_angle = (larger_angle_singlewise(angle, max_angle) == angle) ? angle : max_angle;
-    min_angle = (larger_angle_singlewise(angle, min_angle) == angle) ? min_angle : angle;
-  }
-  double min = std::round(min_angle * (180 / M_PI) / contour_res);
-  double max = std::round(max_angle * (180 / M_PI) / contour_res);
-  int contour_n = (max - min > 0) ? static_cast<int>(max - min + 1) : static_cast<int>(max - min + 720 + 1);
+  if (cloud->points.size() == 0)
+    return cloud;
+  int max_angle_idx = 0;
+  int min_angle_idx = 0;
+  for (int i = 0; i < cloud->points.size(); i++)
+  {
+    auto& pt = cloud->points.at(i);
+    double theta = std::atan2(pt.y, pt.x);
 
-  std::vector<int> sorted_contour_idx(contour_n, -1);
-  for (int idx = 0; idx < input_cloud->points.size(); idx++){
-    auto pt = input_cloud->points.at(idx);
-    double angle = (max_angle - min_angle > 0) ? std::atan2(pt.y, pt.x) : ((std::atan2(pt.y, pt.x) < 0) ? std::atan2(pt.y, pt.x) + 2 * M_PI : std::atan2(pt.y, pt.x));
-    double angle_deg = angle * (180 / M_PI);
-    double min_angle_deg = min_angle * (180 / M_PI);
-    double rel_angle = angle_deg - min_angle_deg;
-    int angle_idx = static_cast<int>(std::round(rel_angle / contour_res));
-    if (angle_idx >= contour_n)
-      continue;
-    sorted_contour_idx[angle_idx] = idx;
+
+    double prev_max_angle = std::atan2(cloud->points.at(max_angle_idx).y, cloud->points.at(max_angle_idx).x);
+    double prev_min_angle = std::atan2(cloud->points.at(min_angle_idx).y, cloud->points.at(min_angle_idx).x);
+
+    max_angle_idx = (larger_angle_singlewise(theta, prev_max_angle) == theta) ? i : max_angle_idx;
+    min_angle_idx = (larger_angle_singlewise(theta, prev_min_angle) == theta) ? min_angle_idx : i;
   }
+
+  auto max_angle_pt = cloud->points.at(max_angle_idx);
+  auto min_angle_pt = cloud->points.at(min_angle_idx);
+  Eigen::Vector2f midpoint(
+      0.5f * (min_angle_pt.x + max_angle_pt.x),
+      0.5f * (min_angle_pt.y + max_angle_pt.y)
+  );
   
+  Eigen::Vector2f line_vec(
+      max_angle_pt.x - min_angle_pt.x,
+      max_angle_pt.y - min_angle_pt.y
+  );
+  line_vec.normalize();
 
-  return sorted_contour_idx;
+  pcl::PointCloud<pcl::PointXYZ>::Ptr result(new pcl::PointCloud<pcl::PointXYZ>);
+  int reflected_count = 0, preserved_count = 0;
+
+
+  for (const auto& pt : cloud->points) {
+      Eigen::Vector2f p(pt.x, pt.y);
+      Eigen::Vector2f v = p - midpoint;
+
+      float d = v.dot(line_vec); 
+
+      if (d < 0) {  
+          Eigen::Vector2f reflected = p - 2 * d * line_vec;
+          result->points.emplace_back(reflected.x(), reflected.y(), pt.z);
+          reflected_count++;
+      } else {
+          result->points.emplace_back(pt);
+          preserved_count++;
+      }
+  }
+  double area = computeAreaWithClipper2(result);
+  cout << "area  : " << area << endl;
+  bool is_symmetric = false;
+  if (area < 0.2)
+    is_symmetric = true;
+  cout << "is Symmetric : " << is_symmetric << endl;
+
+  return result;
 }
 
 std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContourV2(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clusterCloud_vector, std::vector<std::vector<double>>& dbscan_obj_list, 
@@ -369,11 +399,11 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
   select_roi(rawCloud, mat_of_PC);  
   ground_removal(rawCloud, nongroundCloud, mat_of_PC);
 
-  sensor_msgs::msg::PointCloud2 nongroundCloud_msg;
-  pcl::toROSMsg(*nongroundCloud, nongroundCloud_msg);
-  nongroundCloud_msg.header.frame_id = frame_id_lidar;
-  nongroundCloud_msg.header.stamp = this->get_clock()->now();
-  nongroundCloud_pub->publish(nongroundCloud_msg);
+  // sensor_msgs::msg::PointCloud2 nongroundCloud_msg;
+  // pcl::toROSMsg(*nongroundCloud, nongroundCloud_msg);
+  // nongroundCloud_msg.header.frame_id = frame_id_lidar;
+  // nongroundCloud_msg.header.stamp = this->get_clock()->now();
+  // nongroundCloud_pub->publish(nongroundCloud_msg);
   tc.finish("ground_removal");
 
   tc.start("getObjectList");
@@ -386,11 +416,13 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
     nonground_data.push_back(vec3f{pt.x, pt.y, pt.z});
   }
   auto clusters = dbscan_clustering(nonground_data, clusterCloud);
-  sensor_msgs::msg::PointCloud2 cluster_cloud_msg;
-  pcl::toROSMsg(*clusterCloud, cluster_cloud_msg);
-  cluster_cloud_msg.header.frame_id = frame_id_lidar;
-  cluster_cloud_msg.header.stamp = this->get_clock()->now();
-  clustercloud_pub->publish(cluster_cloud_msg);
+
+  // sensor_msgs::msg::PointCloud2 cluster_cloud_msg;
+  // pcl::toROSMsg(*clusterCloud, cluster_cloud_msg);
+  // cluster_cloud_msg.header.frame_id = frame_id_lidar;
+  // cluster_cloud_msg.header.stamp = this->get_clock()->now();
+  // clustercloud_pub->publish(cluster_cloud_msg);
+
   auto dbscan_obj_list = getObjectList(nonground_data, clusters, md_type);
   tc.finish("getObjectList");
   auto clusterCloud_vector = getClusters(clusters, nonground_data);
@@ -402,7 +434,19 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
   auto contourCloud_vector = getContourV2(clusterCloud_vector, dbscan_obj_list, CONTOUR_RES, CONTOUR_Z_THRH, dist_ang_list);
   // pushClusters(contourCloud_vector, dist_ang_list);
 
-  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
+  
+  clusterCloud -> clear();
+  for (auto contour : contourCloud_vector){
+    // pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
+
+    auto cloud = isSymmetric(contour);
+
+    for (auto& pt : cloud->points){
+      clusterCloud->points.push_back(pt);
+    }
+    cloud -> clear();
+
+  }
       
   // cloud->points.push_back(pcl::PointXYZ(2,2,0));
   // cloud->points.push_back(pcl::PointXYZ(3,2,0));
@@ -421,6 +465,11 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
   // cloud->points.push_back(pcl::PointXYZ(4,4,0));
   // cloud->points.push_back(pcl::PointXYZ(2,4,0));
 
+  sensor_msgs::msg::PointCloud2 cluster_cloud_msg;
+  pcl::toROSMsg(*clusterCloud, cluster_cloud_msg);
+  cluster_cloud_msg.header.frame_id = frame_id_lidar;
+  cluster_cloud_msg.header.stamp = this->get_clock()->now();
+  clustercloud_pub->publish(cluster_cloud_msg);
   
   
   

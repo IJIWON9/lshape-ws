@@ -350,8 +350,12 @@ public:
 
   void interpolateContour(pcl::PointCloud<pcl::PointXYZ>::Ptr filtered, pcl::PointCloud<pcl::PointXYZ>::Ptr cluster, 
                             int contour_n, std::vector<int>& contour_pt_idx, double average_z);
+  
+  pcl::PointCloud<pcl::PointXYZ>::Ptr isSymmetric(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
 
-  std::vector<int> sortByAngle(pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud, double contour_res);
+
+
+  
 
   
   
@@ -582,21 +586,6 @@ private:
       }
 
       return total_area;
-  }
-
-  double computeSignedArea(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud) {
-    if (cloud->size() < 3) return 0.0;
-
-    double area = 0.0;
-    size_t n = cloud->size();
-
-    for (size_t i = 0; i < n; ++i) {
-        const pcl::PointXYZ& p1 = cloud->points[i];
-        const pcl::PointXYZ& p2 = cloud->points[(i + 1) % n];  // 다음 점 (마지막이면 첫 점으로)
-        area += (p1.x * p2.y) - (p2.x * p1.y);
-    }
-
-    return std::abs(area) / 2;  // 절댓값을 원하면 fabs(area) 사용
   }
 
   double larger_angle_singlewise(double theta1, double theta2)   
