@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.8)
 project(rule_based_detect)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 set(CMAKE_BUILD_TYPE "Release")
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -21,7 +24,7 @@ find_package(PCL REQUIRED)
 find_package(pcl_conversions REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
-find_package(OpenCV REQUIRED)
+
 
 set(ROS_DEPENDENCY_LIST
     rclcpp
@@ -38,7 +41,13 @@ set(ROS_DEPENDENCY_LIST
 
 include_directories(
   ${PCL_INCLUDE_DIRS}
-  include)
+  include
+  ${PROJECT_SOURCE_DIR}/ext_lib/Clipper2/CPP/Clipper2Lib/include)
+
+file(GLOB CLIPPER2_SRC
+    ${PROJECT_SOURCE_DIR}/ext_lib/Clipper2/CPP/Clipper2Lib/src/*.cpp)
+add_library(clipper2 STATIC ${CLIPPER2_SRC})
+
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 
@@ -48,14 +57,17 @@ add_subdirectory(ext_lib/SimpleDBSCAN)
 add_executable(rule_based_detection src/rule_based_detection.cpp)
 add_executable(lshape_detect src/lshape_detect.cpp)
 
+target_include_directories(clipper2 PUBLIC
+  ${PROJECT_SOURCE_DIR}/ext_lib/Clipper2/CPP/Clipper2Lib/include
+)
 target_link_libraries(rule_based_detection 
     ${PCL_LIBRARIES}
     SimpleDBSCAN
     )
-target_link_libraries(lshape_detect 
-    ${PCL_LIBRARIES}
-    SimpleDBSCAN
-    ${OpenCV_LIBS}
+target_link_libraries(lshape_detect
+      ${PCL_LIBRARIES}
+      SimpleDBSCAN
+      clipper2
     )
 
 ament_target_dependencies(rule_based_detection

@@ -288,18 +288,6 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContourV2(std:
     interpolateContour(filtered, cluster, contour_n, contour_pt_idx, dbscan_obj_list[c_idx][2]);
 
 
-    // smoothing
-    // for (int i = 0; i < contour_pt_idx.size(); i++){
-    //   if (contour_pt_idx[i] != -1){
-    //     cout << i << " ";
-    //   } else if (contour_pt_idx[i] == 9999){
-    //     cout << contour_pt_idx[i] << " ";
-    //   }
-    // }
-    // cout << endl;
-    double area = computeClosedAreaFromPointCloud(filtered);
-    cout << "area " << area << endl;
-
     contourCloud_vector.push_back(filtered);
   }
   // cout << "contours : " << contourCloud_vector.size() << endl;
@@ -413,6 +401,27 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
   
   auto contourCloud_vector = getContourV2(clusterCloud_vector, dbscan_obj_list, CONTOUR_RES, CONTOUR_Z_THRH, dist_ang_list);
   // pushClusters(contourCloud_vector, dist_ang_list);
+
+  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
+      
+  // cloud->points.push_back(pcl::PointXYZ(2,2,0));
+  // cloud->points.push_back(pcl::PointXYZ(3,2,0));
+  // cloud->points.push_back(pcl::PointXYZ(4,2,0));
+  // cloud->points.push_back(pcl::PointXYZ(4,4,0));
+  // cloud->points.push_back(pcl::PointXYZ(4,5,0));
+  // cloud->points.push_back(pcl::PointXYZ(4,8,0));
+  // cloud->points.push_back(pcl::PointXYZ(8,8,0));
+  // cloud->points.push_back(pcl::PointXYZ(8,4,0));
+  // cloud->points.push_back(pcl::PointXYZ(5,4,0));
+  // cloud->points.push_back(pcl::PointXYZ(2,4,0));
+  // cloud->points.push_back(pcl::PointXYZ(2,3,0));
+
+  // cloud->points.push_back(pcl::PointXYZ(2,2,0));
+  // cloud->points.push_back(pcl::PointXYZ(4,2,0));
+  // cloud->points.push_back(pcl::PointXYZ(4,4,0));
+  // cloud->points.push_back(pcl::PointXYZ(2,4,0));
+
+  
   
   
 

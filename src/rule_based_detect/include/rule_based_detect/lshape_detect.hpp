@@ -34,11 +34,13 @@
 #include <pcl/segmentation/sac_segmentation.h>
 #include <pcl/segmentation/extract_clusters.h>
 
-#include <opencv2/opencv.hpp>
 
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
 #include <unsupported/Eigen/CXX11/Tensor>
+
+
+#include <clipper2/clipper.h>
 
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/string.hpp"
@@ -49,6 +51,11 @@
 using std::cout;
 using std::endl;
 using namespace std::chrono_literals;
+
+using namespace Clipper2Lib;
+
+// 클리퍼는 정수 기반이므로 배율 필요
+constexpr double scale_clipper = 1000.0;
 
 // struct OusterPointXYZIRT           //os2
 // {
@@ -544,67 +551,52 @@ private:
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr nongroundCloud_pub;
   rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr line_pub;
 
-  double computeClosedAreaFromPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, bool show_debug = false) {
-    if (cloud->empty()) return 0.0;
 
-    // 1. PointCloud의 XY 범위 계산
-    float min_x = std::numeric_limits<float>::max();
-    float min_y = std::numeric_limits<float>::max();
-    float max_x = -std::numeric_limits<float>::max();
-    float max_y = -std::numeric_limits<float>::max();
+  double computeAreaWithClipper2(const pcl::PointCloud<pcl::PointXYZ>::ConstPtr& cloud) {
+      if (cloud->size() < 3) return 0.0;
 
-    for (const auto& pt : cloud->points) {
-        min_x = std::min(min_x, pt.x);
-        min_y = std::min(min_y, pt.y);
-        max_x = std::max(max_x, pt.x);
-        max_y = std::max(max_y, pt.y);
+      // 1. PointCloud → Clipper Path
+      Path64 path;
+      for (const auto& pt : cloud->points) {
+          path.emplace_back(static_cast<int64_t>(pt.x * scale_clipper),
+                            static_cast<int64_t>(pt.y * scale_clipper));
+      }
+
+      // 2. 닫힌 경로 보장 (선택 사항)
+      if (path.front() != path.back()) {
+          path.push_back(path.front());
+      }
+
+      // 3. Clipper 객체 생성 및 subject 추가
+      Clipper64 clipper;
+      clipper.AddSubject(Paths64{path}); 
+
+      // 4. 자가 충돌 포함한 polygon -> 단순 polygon으로 분해
+      Paths64 solution;
+      clipper.Execute(ClipType::Union, FillRule::NonZero, solution);
+
+      // 5. 절대 넓이 합산
+      double total_area = 0.0;
+      for (const auto& poly : solution) {
+          total_area += std::abs(Area(poly)) / (scale_clipper * scale_clipper);  // 스케일 복구
+      }
+
+      return total_area;
+  }
+
+  double computeSignedArea(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud) {
+    if (cloud->size() < 3) return 0.0;
+
+    double area = 0.0;
+    size_t n = cloud->size();
+
+    for (size_t i = 0; i < n; ++i) {
+        const pcl::PointXYZ& p1 = cloud->points[i];
+        const pcl::PointXYZ& p2 = cloud->points[(i + 1) % n];  // 다음 점 (마지막이면 첫 점으로)
+        area += (p1.x * p2.y) - (p2.x * p1.y);
     }
 
-    // 2. 이미지 크기 및 초기화
-    const int imageSize = 256;
-    cv::Mat img = cv::Mat::zeros(imageSize, imageSize, CV_8UC1);
-
-    // 3. 포인트들을 이미지에 그리기 (2x2 픽셀 블록으로)
-    for (const auto& pt : cloud->points) {
-        int x = static_cast<int>(((pt.x - min_x) / (max_x - min_x)) * (imageSize - 1));
-        int y = static_cast<int>(((pt.y - min_y) / (max_y - min_y)) * (imageSize - 1));
-
-        // 이미지 좌표계는 y가 아래로 증가하므로 보정 필요
-        int row = imageSize - y - 1;
-        int col = x;
-
-        if (row >= 1 && row < imageSize - 1 && col >= 1 && col < imageSize - 1) {
-            cv::rectangle(img, cv::Point(col - 1, row - 1), cv::Point(col + 1, row + 1), 255, cv::FILLED);
-        }
-    }
-
-    // 디버그용 이미지 확인
-    if (show_debug) {
-        cv::imshow("PointCloud Image", img);
-        cv::waitKey(0);
-    }
-
-    // 4. Contour 추출
-    std::vector<std::vector<cv::Point>> contours;
-    cv::findContours(img, contours, cv::RETR_LIST, cv::CHAIN_APPROX_SIMPLE);
-
-    // 5. 각 contour 넓이 계산
-    double total_area_px = 0.0;
-    for (const auto& contour : contours) {
-        double area = cv::contourArea(contour);
-        if (area > 1.0) {  // 너무 작은 contour는 무시
-            total_area_px += area;
-        }
-    }
-
-    // 6. 넓이 환산: 전체 실제 크기에 비례한 비율 계산
-    double range_x = max_x - min_x;
-    double range_y = max_y - min_y;
-    double pixel_size_x = range_x / imageSize;
-    double pixel_size_y = range_y / imageSize;
-    double pixel_area_m2 = pixel_size_x * pixel_size_y;
-
-    return total_area_px;  // 실제 면적 (m^2)
+    return std::abs(area) / 2;  // 절댓값을 원하면 fabs(area) 사용
   }
 
   double larger_angle_singlewise(double theta1, double theta2)   
