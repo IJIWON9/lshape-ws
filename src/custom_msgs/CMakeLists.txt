@@ -22,6 +22,7 @@ find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
 
 # file(GLOB MSG_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} msg/*.msg)
 
@@ -37,6 +38,7 @@ set(MSG_FILES
   "msg/BoundingBoxArray.msg"
   "msg/Rlstate.msg"
   "msg/Episodeflag.msg"
+  "msg/ContourSegments.msg"
 )
 
 set(SRV_FILES

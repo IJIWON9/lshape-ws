@@ -39,6 +39,7 @@
 #include <Eigen/Geometry>
 #include <unsupported/Eigen/CXX11/Tensor>
 
+#include <yaml-cpp/yaml.h>
 
 #include <clipper2/clipper.h>
 
@@ -138,6 +139,9 @@ public:
     lane_3_data_x = readColumnData(LANE_3_FILE_PATH, csv_index_x);
     lane_3_data_y = readColumnData(LANE_3_FILE_PATH, csv_index_y);
     lane_3_data_z = readColumnData(LANE_3_FILE_PATH, csv_index_z);
+
+    config_data = YAML::LoadFile(yaml_config_path);
+    this->config_params();
     
     // publishers
     resultmarker_pub = this->create_publisher<visualization_msgs::msg::MarkerArray>("/rulebased/result_marker", 10);
@@ -337,16 +341,13 @@ public:
   
   void pushClusters(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clusterCloud_vector, std::vector<std::vector<double>> dist_angle_list);
 
-  std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> getContour(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clusterCloud_vector,  
-                                                                          std::vector<std::vector<double>>& dbscan_obj_list, const int contour_n, 
-                                                                          const double contour_z_thresh);
 
-  std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> getContourV2(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clusterCloud_vector, std::vector<std::vector<double>>& dbscan_obj_list, 
-                                                                          const double contour_res, const double contour_z_thresh, std::vector<std::vector<double>>& dist_angle_list);
+  std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> getContour(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clusterCloud_vector, std::vector<std::vector<double>>& dbscan_obj_list, 
+                                                                std::vector<std::vector<double>>& dist_angle_list);
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr removeOutlier(pcl::PointCloud<pcl::PointXYZ>::Ptr obj_contour, 
                                                     double max_distance, std::vector<int>& contour_pt_idx,
-                                                    double min_angle, double max_angle, double contour_res);
+                                                    double min_angle, double max_angle);
 
   void interpolateContour(pcl::PointCloud<pcl::PointXYZ>::Ptr filtered, pcl::PointCloud<pcl::PointXYZ>::Ptr cluster, 
                             int contour_n, std::vector<int>& contour_pt_idx, double average_z);
@@ -454,6 +455,8 @@ public:
   pcl::PointCloud<pcl::PointXYZ>::Ptr clusterCloud;
   pcl::PointCloud<pcl::PointXYZ>::Ptr contourCloud;
 
+  
+
 
 
   double utm_offset_x = 442000.0;
@@ -511,11 +514,18 @@ public:
   const std::string LANE_1_FILE_PATH = pkg_share_dir + LOCAL_LANE_1_FILE_PATH;
   const std::string LANE_2_FILE_PATH = pkg_share_dir + LOCAL_LANE_2_FILE_PATH;
   const std::string LANE_3_FILE_PATH = pkg_share_dir + LOCAL_LANE_3_FILE_PATH;
+
+  std::string config_root_dir = "/../../../../config/lshape_detect.yaml";
+  const std::string yaml_config_path = pkg_share_dir + config_root_dir;
+    
   
+  YAML::Node config_data;
 
   const int csv_index_x = 0;
   const int csv_index_y = 1;
   const int csv_index_z = 2;
+  
+  int MAPDATA_TYPE = 0;
 
   double THRESHOLD_dM = 0.5;
   double MAX_RANGE = 150.0;
@@ -530,16 +540,19 @@ public:
   double THRESHOLD_DISTANCE2LINK = 1.2;
   int N_RANGE = int((MAX_RANGE - MIN_RANGE) / RANGE_RESOLUTION) + 1;  
 
-  int CONTOUR_N = 720;
   double CONTOUR_RES = 0.5;
   double CONTOUR_Z_THRH = 0.5;
+
+  double CONTOUR_MIN_AREA = 0.01;
+  double CONTOUR_MAX_AREA = 1.5;
+  double SYMMETRIC_MAX_AREA = 0.2;
 
   Eigen::Isometry3d lidarPose, currPose;
 
    
 
   uint DBSCAN_PTS = 4;
-  const float DBSCAN_EPS = 1.5;
+  float DBSCAN_EPS = 1.5;
   const std::string frame_id_lidar = "os1_frame";
 
   PointMatrices mat_of_PC;
@@ -554,6 +567,29 @@ private:
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr boundaryCloud_pub;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr nongroundCloud_pub;
   rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr line_pub;
+
+  void config_params()
+  {
+    MAPDATA_TYPE = config_data["parameters"]["MAPDATA_TYPE"].as<int>();
+    MAX_RANGE = config_data["parameters"]["MAX_RANGE"].as<double>();
+    MIN_RANGE = config_data["parameters"]["MIN_RANGE"].as<double>();
+    RANGE_RESOLUTION = config_data["parameters"]["RANGE_RESOLUTION"].as<double>();
+    N_HORIZONTAL = config_data["parameters"]["N_HORIZONTAL"].as<int>();
+    N_FILTER_CHANNEL = config_data["parameters"]["N_FILTER_CHANNEL"].as<int>();
+    THRESHOLD_Z = config_data["parameters"]["THRESHOLD_Z"].as<double>();
+    THRESHOLD_HEIGHT_GAP = config_data["parameters"]["THRESHOLD_HEIGHT_GAP"].as<double>();
+    H_RES = M_PI * 2 / N_HORIZONTAL;
+    THRESHOLD_DISTANCE2BORDER = config_data["parameters"]["THRESHOLD_DISTANCE2BORDER"].as<double>();
+
+    DBSCAN_PTS = config_data["parameters"]["DBSCAN_PTS"].as<int>();
+    DBSCAN_EPS = config_data["parameters"]["DBSCAN_EPS"].as<float>();
+
+    CONTOUR_RES = config_data["parameters"]["CONTOUR_RES"].as<double>();
+    CONTOUR_Z_THRH = config_data["parameters"]["CONTOUR_Z_THRH"].as<double>();
+    SYMMETRIC_MAX_AREA = config_data["parameters"]["SYMMETRIC_MAX_AREA"].as<double>();
+    CONTOUR_MIN_AREA = config_data["parameters"]["CONTOUR_MIN_AREA"].as<double>();
+    CONTOUR_MAX_AREA = config_data["parameters"]["CONTOUR_MAX_AREA"].as<double>();
+  }
 
 
   double computeAreaWithClipper2(const pcl::PointCloud<pcl::PointXYZ>::ConstPtr& cloud) {

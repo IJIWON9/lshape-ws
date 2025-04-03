@@ -24,6 +24,7 @@ find_package(PCL REQUIRED)
 find_package(pcl_conversions REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(yaml-cpp REQUIRED)
 
 
 set(ROS_DEPENDENCY_LIST
@@ -68,6 +69,7 @@ target_link_libraries(lshape_detect
       ${PCL_LIBRARIES}
       SimpleDBSCAN
       clipper2
+      yaml-cpp
     )
 
 ament_target_dependencies(rule_based_detection
