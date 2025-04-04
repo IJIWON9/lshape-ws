@@ -54,7 +54,7 @@ endif()
 rosidl_generate_interfaces(${PROJECT_NAME}
   ${MSG_FILES}
   ${SRV_FILES}
-  DEPENDENCIES std_msgs builtin_interfaces geometry_msgs visualization_msgs nav_msgs
+  DEPENDENCIES std_msgs builtin_interfaces geometry_msgs visualization_msgs nav_msgs sensor_msgs
   ADD_LINTER_TESTS
 )
 

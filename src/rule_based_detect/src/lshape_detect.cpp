@@ -191,10 +191,94 @@ void LShapeDetect::interpolateContour(pcl::PointCloud<pcl::PointXYZ>::Ptr filter
     }
   }
 }
-pcl::PointCloud<pcl::PointXYZ>::Ptr LShapeDetect::isSymmetric(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud)
+bool LShapeDetect::isOrthogonal(pcl::PointXYZ pt1, pcl::PointXYZ pt2, pcl::PointXYZ pt_c)
 {
-  if (cloud->points.size() == 0)
-    return cloud;
+  double v1_x = pt1.x - pt_c.x;
+  double v1_y = pt1.y - pt_c.y;
+  double v2_x = pt2.x - pt_c.x;
+  double v2_y = pt2.y - pt_c.y;
+
+  double dot = v1_x * v2_x + v1_y * v2_y;
+
+  double norm1 = std::sqrt(v1_x * v1_x + v1_y * v1_y);
+  double norm2 = std::sqrt(v2_x * v2_x + v2_y * v2_y);
+
+  if (norm1 == 0.0 || norm2 == 0.0)
+      return false;
+
+
+  double cos_theta = std::abs(dot / (norm1 * norm2));
+  cos_theta = std::clamp(cos_theta, 0.0, 1.0); 
+
+  double angle_deg = std::acos(cos_theta) * 180.0 / M_PI;
+
+  return (angle_deg > CONTOUR_ORTHO_MIN);
+}
+std::pair<int, bool> LShapeDetect::getCornerPointIdx(pcl::PointCloud<pcl::PointXYZ>::Ptr contourCloud, std::vector<pcl::PointXYZ>& line_pts)
+{
+  auto maxminIdx = getMaxminIdx(contourCloud);
+
+  auto pt1 = contourCloud->points.at(maxminIdx[0]);
+  auto pt2 = contourCloud->points.at(maxminIdx[1]);
+  int pt_c_idx = 0;
+
+  double a = pt2.y - pt1.y;
+  double b = pt1.x - pt2.x;
+  double c = pt2.x * pt1.y - pt1.x * pt2.y;
+
+  for (int i = 0; i < contourCloud->points.size(); i++){
+    auto& pt = contourCloud->points.at(i);
+    auto& pt_c = contourCloud->points.at(pt_c_idx);
+    double max_baseline_distance = std::abs(a*pt_c.x + b*pt_c.y + c) / std::sqrt(a*a + b*b);
+    double cur_baseline_distance = std::abs(a*pt.x + b*pt.y + c) / std::sqrt(a*a + b*b);
+    pt_c_idx = (max_baseline_distance < cur_baseline_distance) ? i : pt_c_idx;
+  }
+  bool is_orthogonal = isOrthogonal(pt1, pt2, contourCloud->points.at(pt_c_idx));
+
+  line_pts.push_back(pt1);
+  line_pts.push_back(contourCloud->points.at(pt_c_idx));
+  line_pts.push_back(contourCloud->points.at(pt_c_idx));
+  line_pts.push_back(pt2);
+
+  return {pt_c_idx, is_orthogonal};
+}
+
+std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContourSegments(pcl::PointCloud<pcl::PointXYZ>::Ptr contourCloud, std::vector<pcl::PointXYZ>& line_pts)
+{
+  std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> contour_segments;
+
+  if (contourCloud->points.size() == 0)
+    return contour_segments;
+  
+  bool is_symmetric = isSymmetric(getReflected(contourCloud));
+  if (is_symmetric){
+    cout << "!! symmetric contour" << endl;
+    cout << "   need seperation if orthgonal" << endl;
+    auto [pt_c_idx, is_orth] = getCornerPointIdx(contourCloud, line_pts);
+    cout << "   Orth : " << is_orth << endl;
+  }
+  else{
+    cout << "@@ asymmetric contour" << endl;
+    auto [pt_c_idx, is_orth] = getCornerPointIdx(contourCloud, line_pts);
+
+  }
+
+  
+  return contour_segments;
+}
+
+bool LShapeDetect::isSymmetric(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud)
+{
+  double area = computeAreaWithClipper2(cloud);
+  bool is_symmetric = false;
+  if (area < SYMMETRIC_MAX_AREA)
+    is_symmetric = true;
+  
+  return is_symmetric;
+}
+std::vector<int> LShapeDetect::getMaxminIdx(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud)
+{
+  std::vector<int> maxminIdx;
   int max_angle_idx = 0;
   int min_angle_idx = 0;
   for (int i = 0; i < cloud->points.size(); i++)
@@ -202,16 +286,26 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr LShapeDetect::isSymmetric(pcl::PointCloud<pc
     auto& pt = cloud->points.at(i);
     double theta = std::atan2(pt.y, pt.x);
 
-
     double prev_max_angle = std::atan2(cloud->points.at(max_angle_idx).y, cloud->points.at(max_angle_idx).x);
     double prev_min_angle = std::atan2(cloud->points.at(min_angle_idx).y, cloud->points.at(min_angle_idx).x);
 
     max_angle_idx = (larger_angle_singlewise(theta, prev_max_angle) == theta) ? i : max_angle_idx;
     min_angle_idx = (larger_angle_singlewise(theta, prev_min_angle) == theta) ? min_angle_idx : i;
   }
+  maxminIdx.push_back(max_angle_idx);
+  maxminIdx.push_back(min_angle_idx);
 
-  auto max_angle_pt = cloud->points.at(max_angle_idx);
-  auto min_angle_pt = cloud->points.at(min_angle_idx);
+  return maxminIdx;
+}
+pcl::PointCloud<pcl::PointXYZ>::Ptr LShapeDetect::getReflected(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud)
+{
+  if (cloud->points.size() == 0)
+    return cloud;
+  
+  auto maxminIdx = getMaxminIdx(cloud);
+
+  auto max_angle_pt = cloud->points.at(maxminIdx[0]);
+  auto min_angle_pt = cloud->points.at(maxminIdx[1]);
   Eigen::Vector2f midpoint(
       0.5f * (min_angle_pt.x + max_angle_pt.x),
       0.5f * (min_angle_pt.y + max_angle_pt.y)
@@ -224,7 +318,6 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr LShapeDetect::isSymmetric(pcl::PointCloud<pc
   line_vec.normalize();
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr result(new pcl::PointCloud<pcl::PointXYZ>);
-  int reflected_count = 0, preserved_count = 0;
 
 
   for (const auto& pt : cloud->points) {
@@ -236,18 +329,10 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr LShapeDetect::isSymmetric(pcl::PointCloud<pc
       if (d < 0) {  
           Eigen::Vector2f reflected = p - 2 * d * line_vec;
           result->points.emplace_back(reflected.x(), reflected.y(), pt.z);
-          reflected_count++;
       } else {
           result->points.emplace_back(pt);
-          preserved_count++;
       }
   }
-  double area = computeAreaWithClipper2(result);
-  cout << "area  : " << area << endl;
-  bool is_symmetric = false;
-  if (area < SYMMETRIC_MAX_AREA)
-    is_symmetric = true;
-  cout << "is Symmetric : " << is_symmetric << endl;
 
   return result;
 }
@@ -345,11 +430,11 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
   select_roi(rawCloud, mat_of_PC);  
   ground_removal(rawCloud, nongroundCloud, mat_of_PC);
 
-  // sensor_msgs::msg::PointCloud2 nongroundCloud_msg;
-  // pcl::toROSMsg(*nongroundCloud, nongroundCloud_msg);
-  // nongroundCloud_msg.header.frame_id = frame_id_lidar;
-  // nongroundCloud_msg.header.stamp = this->get_clock()->now();
-  // nongroundCloud_pub->publish(nongroundCloud_msg);
+  sensor_msgs::msg::PointCloud2 nongroundCloud_msg;
+  pcl::toROSMsg(*nongroundCloud, nongroundCloud_msg);
+  nongroundCloud_msg.header.frame_id = frame_id_lidar;
+  nongroundCloud_msg.header.stamp = this->get_clock()->now();
+  nongroundCloud_pub->publish(nongroundCloud_msg);
   tc.finish("ground_removal");
 
   tc.start("getObjectList");
@@ -381,10 +466,13 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
 
   
   clusterCloud -> clear();
+
+  std::vector<pcl::PointXYZ> line_pts; // visualize
   for (auto contour : contourCloud_vector){
     // pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
 
-    auto cloud = isSymmetric(contour);
+    auto cloud = getReflected(contour);
+    auto csv = getContourSegments(contour, line_pts);
 
     for (auto& pt : cloud->points){
       clusterCloud->points.push_back(pt);
@@ -392,23 +480,33 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
     cloud -> clear();
 
   }
-      
-  // cloud->points.push_back(pcl::PointXYZ(2,2,0));
-  // cloud->points.push_back(pcl::PointXYZ(3,2,0));
-  // cloud->points.push_back(pcl::PointXYZ(4,2,0));
-  // cloud->points.push_back(pcl::PointXYZ(4,4,0));
-  // cloud->points.push_back(pcl::PointXYZ(4,5,0));
-  // cloud->points.push_back(pcl::PointXYZ(4,8,0));
-  // cloud->points.push_back(pcl::PointXYZ(8,8,0));
-  // cloud->points.push_back(pcl::PointXYZ(8,4,0));
-  // cloud->points.push_back(pcl::PointXYZ(5,4,0));
-  // cloud->points.push_back(pcl::PointXYZ(2,4,0));
-  // cloud->points.push_back(pcl::PointXYZ(2,3,0));
+    
+  visualization_msgs::msg::Marker line_marker;
+  line_marker.header.frame_id = "os1_frame";
+  line_marker.header.stamp = this->now();
+  line_marker.ns = "line_list_namespace";
+  line_marker.id = 0;
+  line_marker.type = visualization_msgs::msg::Marker::LINE_LIST;
+  line_marker.action = visualization_msgs::msg::Marker::ADD;
+  line_marker.lifetime = rclcpp::Duration(100000000 * 1000);
+  line_marker.scale.x = 0.2; 
+  line_marker.color.r = 1.0f;
+  line_marker.color.g = 0.0f;
+  line_marker.color.b = 0.0f;
+  line_marker.color.a = 1.0f; 
 
-  // cloud->points.push_back(pcl::PointXYZ(2,2,0));
-  // cloud->points.push_back(pcl::PointXYZ(4,2,0));
-  // cloud->points.push_back(pcl::PointXYZ(4,4,0));
-  // cloud->points.push_back(pcl::PointXYZ(2,4,0));
+  for (auto pt : line_pts)
+  {
+    geometry_msgs::msg::Point point_msg;
+    point_msg.x = pt.x;
+    point_msg.y = pt.y;
+    point_msg.z = pt.z;
+    line_marker.points.push_back(point_msg);
+  }
+
+
+  line_pub->publish(line_marker);
+
 
   sensor_msgs::msg::PointCloud2 cluster_cloud_msg;
   pcl::toROSMsg(*clusterCloud, cluster_cloud_msg);

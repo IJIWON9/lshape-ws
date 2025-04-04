@@ -146,14 +146,14 @@ public:
     this->config_params();
     
     // publishers
-    resultmarker_pub = this->create_publisher<visualization_msgs::msg::MarkerArray>("/rulebased/result_marker", 10);
-    contour_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("/rulebased/contour", 10);
-    rb_detections_pub = this->create_publisher<custom_msgs::msg::Float64MultiArrayStamped>("/rulebased/detections", 10);
-    clustercloud_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("/rulebased/clusterCloud", 10);
-    boundaryCloud_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("/rulebased/boundaryCloud", 10);
-    nongroundCloud_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("/rulebased/nongroundCloud", 10);
+    // resultmarker_pub = this->create_publisher<visualization_msgs::msg::MarkerArray>("/rulebased/result_marker", 10);
+    // rb_detections_pub = this->create_publisher<custom_msgs::msg::Float64MultiArrayStamped>("/rulebased/detections", 10);
+    boundaryCloud_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("/lshape_detect/boundaryCloud", 10);
+    clustercloud_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("/lshape_detect/clusterCloud", 10);
+    contour_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("/lshape_detect/contour", 10);
+    nongroundCloud_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("/lshape_detect/nongroundCloud", 10);
 
-    line_pub = this->create_publisher<visualization_msgs::msg::Marker>("/rulebased/line_list_marker", 10);
+    line_pub = this->create_publisher<visualization_msgs::msg::Marker>("/lshape_detect/line_list_marker", 10);
 
 
     // subscribers
@@ -354,9 +354,17 @@ public:
   void interpolateContour(pcl::PointCloud<pcl::PointXYZ>::Ptr filtered, pcl::PointCloud<pcl::PointXYZ>::Ptr cluster, 
                             int contour_n, std::vector<int>& contour_pt_idx, double average_z);
   
-  pcl::PointCloud<pcl::PointXYZ>::Ptr isSymmetric(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
+  std::vector<int> getMaxminIdx(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
+  
+  pcl::PointCloud<pcl::PointXYZ>::Ptr getReflected(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
 
+  bool isSymmetric(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
 
+  bool isOrthogonal(pcl::PointXYZ pt1, pcl::PointXYZ pt2, pcl::PointXYZ pt_c);
+
+  std::pair<int, bool> getCornerPointIdx(pcl::PointCloud<pcl::PointXYZ>::Ptr contourCloud, std::vector<pcl::PointXYZ>& line_pts);
+
+  std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> getContourSegments(pcl::PointCloud<pcl::PointXYZ>::Ptr contourCloud, std::vector<pcl::PointXYZ>& line_pts);
 
   
 
@@ -548,6 +556,8 @@ public:
   double CONTOUR_MIN_AREA = 0.01;
   double CONTOUR_MAX_AREA = 1.5;
   double SYMMETRIC_MAX_AREA = 0.2;
+  double CONTOUR_ORTHO_MIN = 80;
+
 
   Eigen::Isometry3d lidarPose, currPose;
 
@@ -562,8 +572,8 @@ public:
   
 
 private:
-  rclcpp::Publisher<custom_msgs::msg::Float64MultiArrayStamped>::SharedPtr rb_detections_pub;
-  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr resultmarker_pub;
+  // rclcpp::Publisher<custom_msgs::msg::Float64MultiArrayStamped>::SharedPtr rb_detections_pub;
+  // rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr resultmarker_pub;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr clustercloud_pub;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr contour_pub;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr boundaryCloud_pub;
@@ -591,6 +601,7 @@ private:
     SYMMETRIC_MAX_AREA = config_data["parameters"]["SYMMETRIC_MAX_AREA"].as<double>();
     CONTOUR_MIN_AREA = config_data["parameters"]["CONTOUR_MIN_AREA"].as<double>();
     CONTOUR_MAX_AREA = config_data["parameters"]["CONTOUR_MAX_AREA"].as<double>();
+    CONTOUR_ORTHO_MIN = config_data["parameters"]["CONTOUR_ORTHO_MIN"].as<double>();
   }
 
 
