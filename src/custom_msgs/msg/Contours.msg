@@ -1,1 +1,2 @@
-custom_msgs/ContourSegments[] Contour
+std_msgs/Header header
+custom_msgs/ContourSegments[] contours

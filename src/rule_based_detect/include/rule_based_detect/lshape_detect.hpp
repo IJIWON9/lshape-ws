@@ -9,6 +9,8 @@
 #include <geometry_msgs/msg/pose.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <custom_msgs/msg/float64_multi_array_stamped.hpp>
+#include <custom_msgs/msg/contour_segments.hpp>
+#include <custom_msgs/msg/contours.hpp>
 #include <visualization_msgs/msg/marker.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
 #include <tf2/LinearMath/Quaternion.h>

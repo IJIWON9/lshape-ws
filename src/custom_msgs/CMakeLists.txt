@@ -39,6 +39,7 @@ set(MSG_FILES
   "msg/Rlstate.msg"
   "msg/Episodeflag.msg"
   "msg/ContourSegments.msg"
+  "msg/Contours.msg"
 )
 
 set(SRV_FILES
