@@ -95,7 +95,7 @@ std::vector<std::vector<double>> LShapeDetect::pullClusters(std::vector<pcl::Poi
   return dist_angle_list;
 }
 pcl::PointCloud<pcl::PointXYZ>::Ptr LShapeDetect::removeOutlier(pcl::PointCloud<pcl::PointXYZ>::Ptr obj_contour, 
-                                                                  double max_distance, std::vector<int>& contour_pt_idx, 
+                                                                  std::vector<int>& contour_pt_idx, 
                                                                   double min_angle, double max_angle)
 {
   pcl::PointCloud<pcl::PointXYZ>::Ptr filtered(new pcl::PointCloud<pcl::PointXYZ>);
@@ -111,8 +111,8 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr LShapeDetect::removeOutlier(pcl::PointCloud<
 
     if (i == 0){
       auto& next = obj_contour->points[i + 1];
-      float dist = std::hypot(next.x - curr.x, next.y - curr.y);
-      if (dist < max_distance) {
+      double dist = std::hypot(next.x - curr.x, next.y - curr.y);
+      if (dist < CONTOUR_OUTLIER_MAX) {
         filtered->points.push_back(curr);
       } else {
         // cout << "deleted 1st " << dist << endl;
@@ -122,8 +122,8 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr LShapeDetect::removeOutlier(pcl::PointCloud<
     } 
     if (i == obj_contour->points.size() - 1){
       auto& prev = obj_contour->points[i - 1];
-      float dist = std::hypot(curr.x - prev.x, curr.y - prev.y);
-      if (dist < max_distance) {
+      double dist = std::hypot(curr.x - prev.x, curr.y - prev.y);
+      if (dist < CONTOUR_OUTLIER_MAX) {
         filtered->points.push_back(curr);
       } else {
         // cout << "deleted last " << dist << endl;
@@ -135,10 +135,10 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr LShapeDetect::removeOutlier(pcl::PointCloud<
     auto& prev = obj_contour->points[i - 1];
     auto& next = obj_contour->points[i + 1];
 
-    float dist1 = std::hypot(curr.x - prev.x, curr.y - prev.y);
-    float dist2 = std::hypot(next.x - curr.x, next.y - curr.y);
+    double dist1 = std::hypot(curr.x - prev.x, curr.y - prev.y);
+    double dist2 = std::hypot(next.x - curr.x, next.y - curr.y);
 
-    if (dist1 < max_distance && dist2 < max_distance) {
+    if (dist1 < CONTOUR_OUTLIER_MAX && dist2 < CONTOUR_OUTLIER_MAX) {
       filtered->points.push_back(curr);
     } else {
       // cout << "deleted : " << dist1 << " " << dist2 << endl;
@@ -242,6 +242,18 @@ std::pair<int, bool> LShapeDetect::getCornerPointIdx(pcl::PointCloud<pcl::PointX
 
   return {pt_c_idx, is_orthogonal};
 }
+void LShapeDetect::seperateContour(pcl::PointCloud<pcl::PointXYZ>::Ptr contourCloud, double corner_angle, std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& contour_segments)
+{
+  pcl::PointCloud<pcl::PointXYZ>::Ptr contour_segment_1(new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::PointCloud<pcl::PointXYZ>::Ptr contour_segment_2(new pcl::PointCloud<pcl::PointXYZ>);
+  for (auto& pt : contourCloud->points){
+    double angle = std::atan2(pt.y, pt.x);
+    if (angle > corner_angle) {contour_segment_1->points.push_back(pt);}
+    else {contour_segment_2->points.push_back(pt);}
+  }
+  contour_segments.push_back(contour_segment_1);
+  contour_segments.push_back(contour_segment_2);
+}
 
 std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContourSegments(pcl::PointCloud<pcl::PointXYZ>::Ptr contourCloud, std::vector<pcl::PointXYZ>& line_pts)
 {
@@ -250,31 +262,44 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContourSegment
   if (contourCloud->points.size() == 0)
     return contour_segments;
   
-  bool is_symmetric = isSymmetric(getReflected(contourCloud));
+  auto [area, is_symmetric] = isSymmetric(getReflected(contourCloud));
+  cout << "pos :" << contourCloud->points.at(0).x << "," << contourCloud->points.at(0).y << " / area : " << area << endl;
+
+  if (area < CONTOUR_MIN_AREA)
+    return contour_segments;
+
+  auto [pt_c_idx, is_orth] = getCornerPointIdx(contourCloud, line_pts);
+  double c_pt_angle = std::atan2(contourCloud->points.at(pt_c_idx).y, contourCloud->points.at(pt_c_idx).x);
+
   if (is_symmetric){
-    cout << "!! symmetric contour" << endl;
-    cout << "   need seperation if orthgonal" << endl;
-    auto [pt_c_idx, is_orth] = getCornerPointIdx(contourCloud, line_pts);
-    cout << "   Orth : " << is_orth << endl;
+    // cout << "!! symmetric contour :: orth : " << is_orth << endl;
+    if (!is_orth){
+      contour_segments.push_back(contourCloud);
+    }else{
+      seperateContour(contourCloud, c_pt_angle, contour_segments);
+    }
   }
   else{
-    cout << "@@ asymmetric contour" << endl;
-    auto [pt_c_idx, is_orth] = getCornerPointIdx(contourCloud, line_pts);
-
+    // cout << "@@ asymmetric contour" << endl;
+    seperateContour(contourCloud, c_pt_angle, contour_segments);
   }
-
+  // for (auto segments : contour_segments){
+  //   auto [_, is_symmetric_seg] = isSymmetric(getReflected(segments));
+  //   cout << "**** segment symmetric : " << is_symmetric_seg << endl;
+  // }
   
   return contour_segments;
 }
 
-bool LShapeDetect::isSymmetric(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud)
+std::pair<double, bool>  LShapeDetect::isSymmetric(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud)
 {
   double area = computeAreaWithClipper2(cloud);
+  
   bool is_symmetric = false;
   if (area < SYMMETRIC_MAX_AREA)
     is_symmetric = true;
   
-  return is_symmetric;
+  return {area, is_symmetric};
 }
 std::vector<int> LShapeDetect::getMaxminIdx(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud)
 {
@@ -317,7 +342,7 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr LShapeDetect::getReflected(pcl::PointCloud<p
   );
   line_vec.normalize();
 
-  pcl::PointCloud<pcl::PointXYZ>::Ptr result(new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::PointCloud<pcl::PointXYZ>::Ptr reflected(new pcl::PointCloud<pcl::PointXYZ>);
 
 
   for (const auto& pt : cloud->points) {
@@ -327,14 +352,14 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr LShapeDetect::getReflected(pcl::PointCloud<p
       float d = v.dot(line_vec); 
 
       if (d < 0) {  
-          Eigen::Vector2f reflected = p - 2 * d * line_vec;
-          result->points.emplace_back(reflected.x(), reflected.y(), pt.z);
+          Eigen::Vector2f reflected_pt = p - 2 * d * line_vec;
+          reflected->points.emplace_back(reflected_pt.x(), reflected_pt.y(), pt.z);
       } else {
-          result->points.emplace_back(pt);
+          reflected->points.emplace_back(pt);
       }
   }
 
-  return result;
+  return reflected;
 }
 
 std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContour(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clusterCloud_vector, std::vector<std::vector<double>>& dbscan_obj_list, 
@@ -398,8 +423,8 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContour(std::v
 
       } 
     }
-    double max_dist = 1.0;
-    auto filtered = removeOutlier(obj_contour, max_dist, contour_pt_idx, min_angle, max_angle);
+
+    auto filtered = removeOutlier(obj_contour, contour_pt_idx, min_angle, max_angle);
     interpolateContour(filtered, cluster, contour_n, contour_pt_idx, dbscan_obj_list[c_idx][2]);
 
 
@@ -415,8 +440,7 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
 
   TimeChecker tc(false);
   tc.start("total");
-  if (MAPDATA_TYPE == 0)
-    generate_mapdata_pointcloud();   
+  generate_mapdata_pointcloud();   
   assemble_mapdata(MAPDATA_TYPE); 
 
 
@@ -430,11 +454,11 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
   select_roi(rawCloud, mat_of_PC);  
   ground_removal(rawCloud, nongroundCloud, mat_of_PC);
 
-  sensor_msgs::msg::PointCloud2 nongroundCloud_msg;
-  pcl::toROSMsg(*nongroundCloud, nongroundCloud_msg);
-  nongroundCloud_msg.header.frame_id = frame_id_lidar;
-  nongroundCloud_msg.header.stamp = this->get_clock()->now();
-  nongroundCloud_pub->publish(nongroundCloud_msg);
+  // sensor_msgs::msg::PointCloud2 nongroundCloud_msg;
+  // pcl::toROSMsg(*nongroundCloud, nongroundCloud_msg);
+  // nongroundCloud_msg.header.frame_id = frame_id_lidar;
+  // nongroundCloud_msg.header.stamp = this->get_clock()->now();
+  // nongroundCloud_pub->publish(nongroundCloud_msg);
   tc.finish("ground_removal");
 
   tc.start("getObjectList");
@@ -462,24 +486,43 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
   auto dist_ang_list = pullClusters(clusterCloud_vector);
   
   auto contourCloud_vector = getContour(clusterCloud_vector, dbscan_obj_list, dist_ang_list);
-  // pushClusters(contourCloud_vector, dist_ang_list);
+  pushClusters(contourCloud_vector, dist_ang_list);
 
   
-  clusterCloud -> clear();
-
+  nongroundCloud -> clear();
+  
   std::vector<pcl::PointXYZ> line_pts; // visualize
   for (auto contour : contourCloud_vector){
     // pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
 
-    auto cloud = getReflected(contour);
+    // auto cloud = getReflected(contour);
     auto csv = getContourSegments(contour, line_pts);
-
-    for (auto& pt : cloud->points){
-      clusterCloud->points.push_back(pt);
+    double i = 10.0;
+    for (auto& cs : csv){
+      for (auto& pt : cs->points){
+        pcl::PointXYZI pp;
+        pp.x = pt.x;
+        pp.y = pt.y;
+        pp.z = pt.z;
+        pp.intensity = i;
+        nongroundCloud->points.push_back(pp);
+      }
+      i += 50.0;
     }
-    cloud -> clear();
+    
+
+    // for (auto& pt : cloud->points){
+    //   clusterCloud->points.push_back(pt);
+    // }
+    // cloud -> clear();
 
   }
+
+  sensor_msgs::msg::PointCloud2 nongroundCloud_msg;
+  pcl::toROSMsg(*nongroundCloud, nongroundCloud_msg);
+  nongroundCloud_msg.header.frame_id = frame_id_lidar;
+  nongroundCloud_msg.header.stamp = this->get_clock()->now();
+  nongroundCloud_pub->publish(nongroundCloud_msg);
     
   visualization_msgs::msg::Marker line_marker;
   line_marker.header.frame_id = "os1_frame";
@@ -488,7 +531,7 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
   line_marker.id = 0;
   line_marker.type = visualization_msgs::msg::Marker::LINE_LIST;
   line_marker.action = visualization_msgs::msg::Marker::ADD;
-  line_marker.lifetime = rclcpp::Duration(100000000 * 1000);
+  line_marker.lifetime = rclcpp::Duration(100000000 * 5000);
   line_marker.scale.x = 0.2; 
   line_marker.color.r = 1.0f;
   line_marker.color.g = 0.0f;

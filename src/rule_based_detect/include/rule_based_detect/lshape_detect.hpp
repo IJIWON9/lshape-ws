@@ -348,7 +348,7 @@ public:
                                                                 std::vector<std::vector<double>>& dist_angle_list);
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr removeOutlier(pcl::PointCloud<pcl::PointXYZ>::Ptr obj_contour, 
-                                                    double max_distance, std::vector<int>& contour_pt_idx,
+                                                    std::vector<int>& contour_pt_idx,
                                                     double min_angle, double max_angle);
 
   void interpolateContour(pcl::PointCloud<pcl::PointXYZ>::Ptr filtered, pcl::PointCloud<pcl::PointXYZ>::Ptr cluster, 
@@ -358,7 +358,7 @@ public:
   
   pcl::PointCloud<pcl::PointXYZ>::Ptr getReflected(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
 
-  bool isSymmetric(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
+  std::pair<double, bool> isSymmetric(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
 
   bool isOrthogonal(pcl::PointXYZ pt1, pcl::PointXYZ pt2, pcl::PointXYZ pt_c);
 
@@ -366,8 +366,7 @@ public:
 
   std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> getContourSegments(pcl::PointCloud<pcl::PointXYZ>::Ptr contourCloud, std::vector<pcl::PointXYZ>& line_pts);
 
-  
-
+  void seperateContour(pcl::PointCloud<pcl::PointXYZ>::Ptr contourCloud, double corner_angle, std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& contour_segments);
   
   
 
@@ -557,6 +556,7 @@ public:
   double CONTOUR_MAX_AREA = 1.5;
   double SYMMETRIC_MAX_AREA = 0.2;
   double CONTOUR_ORTHO_MIN = 80;
+  double CONTOUR_OUTLIER_MAX = 0.5;
 
 
   Eigen::Isometry3d lidarPose, currPose;
@@ -602,6 +602,7 @@ private:
     CONTOUR_MIN_AREA = config_data["parameters"]["CONTOUR_MIN_AREA"].as<double>();
     CONTOUR_MAX_AREA = config_data["parameters"]["CONTOUR_MAX_AREA"].as<double>();
     CONTOUR_ORTHO_MIN = config_data["parameters"]["CONTOUR_ORTHO_MIN"].as<double>();
+    CONTOUR_OUTLIER_MAX = config_data["parameters"]["CONTOUR_OUTLIER_MAX"].as<double>();
   }
 
 
