@@ -491,12 +491,24 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
 
 
  
-  contourSegments -> clear(); 
+  reflectedContour -> clear(); 
   std::vector<pcl::PointXYZ> line_pts; 
 
   custom_msgs::msg::Contours output_contours_msg;
   for (auto contour : contourCloud_vector){
     auto contour_seg_vec = getContourSegments(contour, line_pts);
+
+    auto refl = getReflected(contour);
+
+    for (auto& pt : refl->points){
+      pcl::PointXYZ pp;
+      pp.x = pt.x;
+      pp.y = pt.y;
+      pp.z = pt.z;
+      reflectedContour->points.push_back(pp);
+    }
+
+
 
     custom_msgs::msg::ContourSegments contourSegments_msg;
     for (auto& contour_seg : contour_seg_vec){
@@ -511,19 +523,19 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
     }
     output_contours_msg.contours.push_back(contourSegments_msg);
 
-    // visualize
-    double i = 10.0;
-    for (auto& contour_seg : contour_seg_vec){ 
-      for (auto& pt : contour_seg->points){
-        pcl::PointXYZI pp;
-        pp.x = pt.x;
-        pp.y = pt.y;
-        pp.z = pt.z;
-        pp.intensity = i;
-        contourSegments->points.push_back(pp);
-      }
-      i += 50.0;
-    }
+    // // visualize
+    // double i = 10.0;
+    // for (auto& contour_seg : contour_seg_vec){ 
+    //   for (auto& pt : contour_seg->points){
+    //     pcl::PointXYZI pp;
+    //     pp.x = pt.x;
+    //     pp.y = pt.y;
+    //     pp.z = pt.z;
+    //     pp.intensity = i;
+    //     reflectedContour->points.push_back(pp);
+    //   }
+    //   i += 50.0;
+    // }
   }
 
   outputContours_pub->publish(output_contours_msg);   //result
@@ -531,7 +543,7 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
 
    ////////// visualize //////////
   sensor_msgs::msg::PointCloud2 contourSegments_msg;
-  pcl::toROSMsg(*contourSegments, contourSegments_msg);
+  pcl::toROSMsg(*reflectedContour, contourSegments_msg);
   contourSegments_msg.header.frame_id = FRAME_ID_LIDAR;
   contourSegments_msg.header.stamp = this->get_clock()->now();
   contourSegments_pub->publish(contourSegments_msg);

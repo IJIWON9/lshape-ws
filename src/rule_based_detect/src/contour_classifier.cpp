@@ -34,7 +34,7 @@ public:
       : Node("contour_classifier_node")
   {
     
-    objCloud_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("/contour_classifier/subbed_contour", 10);
+    subbed_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("/contour_classifier/subbed_contour", 10);
 
     auto qos_profile = rclcpp::QoS(rclcpp::KeepLast(1));
     contour_sub = this->create_subscription<custom_msgs::msg::Contours>(
@@ -48,22 +48,55 @@ public:
 
   rclcpp::Subscription<custom_msgs::msg::Contours>::SharedPtr contour_sub;
 
-  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr objCloud_pub;
+  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr subbed_pub;
 
-  
+  const std::string FRAME_ID_LIDAR = "os1_frame";
 
 private:
 
   void contour_sub_callback(const custom_msgs::msg::Contours msg)
   {
-
     TimeChecker tc(false);
     tc.start("total");
+
+    std::vector<std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>> contours;
+
+    pcl::PointCloud<pcl::PointXYZI>::Ptr subbed(new pcl::PointCloud<pcl::PointXYZI>);
     
-    cout << "subbed!!" << endl;
+    for (auto contour : msg.contours){
+      double i = 10.0;
+      std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> contour_segments;
+      for (auto seg : contour.contour_segment){
+        pcl::PointCloud<pcl::PointXYZ>::Ptr contour_segment(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::fromROSMsg(seg, *contour_segment);
+        for (auto pt : contour_segment->points){
+          pcl::PointXYZI pp;
+          pp.x = pt.x;
+          pp.y = pt.y;
+          pp.z = pt.z;
+          pp.intensity = i;
+          subbed->points.push_back(pp);
+        }
+        i += 50.0;
+        contour_segments.push_back(contour_segment);
+
+        contour_segment->clear();
+      }
+      contours.push_back(contour_segments);
+    }
+
+    sensor_msgs::msg::PointCloud2 subbed_msg;
+    pcl::toROSMsg(*subbed, subbed_msg);
+    subbed_msg.header.frame_id = FRAME_ID_LIDAR;
+    subbed_msg.header.stamp = this->get_clock()->now();
+    subbed_pub->publish(subbed_msg);
+
+    
+    
+    subbed->clear();
     
     tc.finish("total");
-    // tc.print();
+    tc.print();
 
     
     
