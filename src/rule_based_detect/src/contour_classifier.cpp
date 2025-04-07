@@ -54,6 +54,13 @@ public:
 
 private:
 
+  void get1Ddata(pcl::PointCloud<pcl::PointXYZ>::Ptr segment)
+  {
+    if (segment->points.size() < 3)
+      return;
+   
+  }
+
   void contour_sub_callback(const custom_msgs::msg::Contours msg)
   {
     TimeChecker tc(false);
@@ -85,14 +92,22 @@ private:
       contours.push_back(contour_segments);
     }
 
+    for (auto c : contours){
+      for (auto& seg : c){
+        get1Ddata(seg);
+      }
+    }
+
+
+
+
+
     sensor_msgs::msg::PointCloud2 subbed_msg;
     pcl::toROSMsg(*subbed, subbed_msg);
     subbed_msg.header.frame_id = FRAME_ID_LIDAR;
     subbed_msg.header.stamp = this->get_clock()->now();
     subbed_pub->publish(subbed_msg);
 
-    
-    
     subbed->clear();
     
     tc.finish("total");

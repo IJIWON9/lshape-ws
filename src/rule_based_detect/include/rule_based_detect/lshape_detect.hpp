@@ -358,7 +358,7 @@ public:
   void interpolateContour(pcl::PointCloud<pcl::PointXYZ>::Ptr filtered, pcl::PointCloud<pcl::PointXYZ>::Ptr cluster, 
                             int contour_n, std::vector<int>& contour_pt_idx, double average_z);
   
-  std::vector<int> getMaxminIdx(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
+  static inline std::vector<int> getMaxminIdx(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
   
   pcl::PointCloud<pcl::PointXYZ>::Ptr getReflected(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud);
 
@@ -372,6 +372,16 @@ public:
 
   void seperateContour(pcl::PointCloud<pcl::PointXYZ>::Ptr contourCloud, double corner_angle, std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& contour_segments);
   
+  static inline double larger_angle_singlewise(double theta1, double theta2)   
+  {
+    double diff = fmod(theta2 - theta1, 2 * M_PI);
+
+    if (diff < 0) {
+        diff += 2 * M_PI;
+    }
+
+    return (diff > M_PI) ? theta1 : theta2;
+  }
   
 
   struct vec4f
@@ -645,16 +655,6 @@ private:
       return total_area;
   }
 
-  double larger_angle_singlewise(double theta1, double theta2)   
-  {
-    double diff = fmod(theta2 - theta1, 2 * M_PI);
-
-    if (diff < 0) {
-        diff += 2 * M_PI;
-    }
-
-    return (diff > M_PI) ? theta1 : theta2;
-  }
   
   void translatePointCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr global_pcd, pcl::PointCloud<pcl::PointXYZ>::Ptr local_pcd, Eigen::Vector3f ego_vec) 
   {
