@@ -263,7 +263,7 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContourSegment
     return contour_segments;
   
   auto [area, is_symmetric] = isSymmetric(getReflected(contourCloud));
-  cout << "pos :" << contourCloud->points.at(0).x << "," << contourCloud->points.at(0).y << " / area : " << area << endl;
+  // cout << "pos :" << contourCloud->points.at(0).x << "," << contourCloud->points.at(0).y << " / area : " << area << endl;
 
   if (area < CONTOUR_MIN_AREA)
     return contour_segments;
@@ -454,11 +454,11 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
   select_roi(rawCloud, mat_of_PC);  
   ground_removal(rawCloud, nongroundCloud, mat_of_PC);
 
-  // sensor_msgs::msg::PointCloud2 nongroundCloud_msg;
-  // pcl::toROSMsg(*nongroundCloud, nongroundCloud_msg);
-  // nongroundCloud_msg.header.frame_id = frame_id_lidar;
-  // nongroundCloud_msg.header.stamp = this->get_clock()->now();
-  // nongroundCloud_pub->publish(nongroundCloud_msg);
+  sensor_msgs::msg::PointCloud2 nongroundCloud_msg;
+  pcl::toROSMsg(*nongroundCloud, nongroundCloud_msg);
+  nongroundCloud_msg.header.frame_id = FRAME_ID_LIDAR;
+  nongroundCloud_msg.header.stamp = this->get_clock()->now();
+  nongroundCloud_pub->publish(nongroundCloud_msg);
   tc.finish("ground_removal");
 
   tc.start("getObjectList");
@@ -474,7 +474,7 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
 
   // sensor_msgs::msg::PointCloud2 cluster_cloud_msg;
   // pcl::toROSMsg(*clusterCloud, cluster_cloud_msg);
-  // cluster_cloud_msg.header.frame_id = frame_id_lidar;
+  // cluster_cloud_msg.header.frame_id = FRAME_ID_LIDAR;
   // cluster_cloud_msg.header.stamp = this->get_clock()->now();
   // clustercloud_pub->publish(cluster_cloud_msg);
 
@@ -488,41 +488,53 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
   auto contourCloud_vector = getContour(clusterCloud_vector, dbscan_obj_list, dist_ang_list);
   pushClusters(contourCloud_vector, dist_ang_list);
 
-  
-  nongroundCloud -> clear();
-  
-  std::vector<pcl::PointXYZ> line_pts; // visualize
-  for (auto contour : contourCloud_vector){
-    // pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
 
-    // auto cloud = getReflected(contour);
-    auto csv = getContourSegments(contour, line_pts);
+
+ 
+  contourSegments -> clear(); 
+  std::vector<pcl::PointXYZ> line_pts; 
+
+  custom_msgs::msg::Contours output_contours_msg;
+  for (auto contour : contourCloud_vector){
+    auto contour_seg_vec = getContourSegments(contour, line_pts);
+
+    custom_msgs::msg::ContourSegments contourSegments_msg;
+    for (auto& contour_seg : contour_seg_vec){
+      if (contour_seg->points.size() == 0)
+        continue;
+      
+      sensor_msgs::msg::PointCloud2 contourSegment_msg;
+      pcl::toROSMsg(*contour_seg, contourSegment_msg);
+      contourSegment_msg.header.frame_id = FRAME_ID_LIDAR;
+      contourSegment_msg.header.stamp = this->get_clock()->now();
+      contourSegments_msg.contour_segment.push_back(contourSegment_msg);
+    }
+    output_contours_msg.contours.push_back(contourSegments_msg);
+
+    // visualize
     double i = 10.0;
-    for (auto& cs : csv){
-      for (auto& pt : cs->points){
+    for (auto& contour_seg : contour_seg_vec){ 
+      for (auto& pt : contour_seg->points){
         pcl::PointXYZI pp;
         pp.x = pt.x;
         pp.y = pt.y;
         pp.z = pt.z;
         pp.intensity = i;
-        nongroundCloud->points.push_back(pp);
+        contourSegments->points.push_back(pp);
       }
       i += 50.0;
     }
-    
-
-    // for (auto& pt : cloud->points){
-    //   clusterCloud->points.push_back(pt);
-    // }
-    // cloud -> clear();
-
   }
 
-  sensor_msgs::msg::PointCloud2 nongroundCloud_msg;
-  pcl::toROSMsg(*nongroundCloud, nongroundCloud_msg);
-  nongroundCloud_msg.header.frame_id = frame_id_lidar;
-  nongroundCloud_msg.header.stamp = this->get_clock()->now();
-  nongroundCloud_pub->publish(nongroundCloud_msg);
+  outputContours_pub->publish(output_contours_msg);   //result
+
+
+   ////////// visualize //////////
+  sensor_msgs::msg::PointCloud2 contourSegments_msg;
+  pcl::toROSMsg(*contourSegments, contourSegments_msg);
+  contourSegments_msg.header.frame_id = FRAME_ID_LIDAR;
+  contourSegments_msg.header.stamp = this->get_clock()->now();
+  contourSegments_pub->publish(contourSegments_msg);
     
   visualization_msgs::msg::Marker line_marker;
   line_marker.header.frame_id = "os1_frame";
@@ -553,21 +565,26 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
 
   sensor_msgs::msg::PointCloud2 cluster_cloud_msg;
   pcl::toROSMsg(*clusterCloud, cluster_cloud_msg);
-  cluster_cloud_msg.header.frame_id = frame_id_lidar;
+  cluster_cloud_msg.header.frame_id = FRAME_ID_LIDAR;
   cluster_cloud_msg.header.stamp = this->get_clock()->now();
   clustercloud_pub->publish(cluster_cloud_msg);
-  
-  
-  
 
-  // visualization
+  
   for (auto& contour : contourCloud_vector)
   {
     for (auto& pt : contour->points){
       contourCloud->points.push_back(pt);
     }
   }
-  tc.start("getContour");
+  
+  sensor_msgs::msg::PointCloud2 cloud_msg;
+  pcl::toROSMsg(*contourCloud, cloud_msg);
+  cloud_msg.header.frame_id = FRAME_ID_LIDAR;
+  cloud_msg.header.stamp = this->get_clock()->now();
+  contour_pub->publish(cloud_msg);
+  
+  ////////// visualize //////////
+  tc.finish("getContour");
 
   
   
@@ -616,15 +633,6 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
   local_border_a->clear();
 
   boundaryCloud -> clear();
-
-
-  
-    
-  sensor_msgs::msg::PointCloud2 cloud_msg;
-  pcl::toROSMsg(*contourCloud, cloud_msg);
-  cloud_msg.header.frame_id = frame_id_lidar;
-  cloud_msg.header.stamp = this->get_clock()->now();
-  contour_pub->publish(cloud_msg);
 
   for (auto cluster : clusterCloud_vector)
   {

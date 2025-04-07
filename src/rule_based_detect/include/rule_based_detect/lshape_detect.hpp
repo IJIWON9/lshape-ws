@@ -99,7 +99,7 @@ class LShapeDetect : public rclcpp::Node
 {
 public:
   LShapeDetect()
-      : Node("rb_detect_node"), mat_of_PC(N_RANGE, N_HORIZONTAL)
+      : Node("lshape_detect_node"), mat_of_PC(N_RANGE, N_HORIZONTAL)
   {
     // load mapdata
     mapdata_l_x = readColumnData(MAP_L_FILE_PATH, csv_index_x);
@@ -152,6 +152,9 @@ public:
     clustercloud_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("/lshape_detect/clusterCloud", 10);
     contour_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("/lshape_detect/contour", 10);
     nongroundCloud_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("/lshape_detect/nongroundCloud", 10);
+    contourSegments_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("/lshape_detect/contourSegments", 10);
+
+    outputContours_pub = this->create_publisher<custom_msgs::msg::Contours>("/lshape_detect/outputContours", 10);
 
     line_pub = this->create_publisher<visualization_msgs::msg::Marker>("/lshape_detect/line_list_marker", 10);
 
@@ -175,6 +178,7 @@ public:
     // initialize pointclouds
     rawCloud.reset(new pcl::PointCloud<pcl::PointXYZ>());
     nongroundCloud.reset(new pcl::PointCloud<pcl::PointXYZI>());
+    contourSegments.reset(new pcl::PointCloud<pcl::PointXYZI>());
     boundaryCloud.reset(new pcl::PointCloud<pcl::PointXYZ>());
 
     global_linkCloud_1.reset(new pcl::PointCloud<pcl::PointXYZ>());
@@ -406,6 +410,7 @@ public:
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr rawCloud;         
   pcl::PointCloud<pcl::PointXYZI>::Ptr nongroundCloud;
+  pcl::PointCloud<pcl::PointXYZI>::Ptr contourSegments;
   pcl::PointCloud<pcl::PointXYZ>::Ptr boundaryCloud;
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr global_linkCloud_1;
@@ -565,7 +570,7 @@ public:
 
   uint DBSCAN_PTS = 4;
   float DBSCAN_EPS = 1.5;
-  const std::string frame_id_lidar = "os1_frame";
+  const std::string FRAME_ID_LIDAR = "os1_frame";
 
   PointMatrices mat_of_PC;
 
@@ -578,6 +583,8 @@ private:
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr contour_pub;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr boundaryCloud_pub;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr nongroundCloud_pub;
+  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr contourSegments_pub;
+  rclcpp::Publisher<custom_msgs::msg::Contours>::SharedPtr outputContours_pub;
   rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr line_pub;
 
   void config_params()
@@ -964,7 +971,7 @@ private:
     }
     sensor_msgs::msg::PointCloud2 boundary_cloud_msg;
     pcl::toROSMsg(*boundaryCloud, boundary_cloud_msg);
-    boundary_cloud_msg.header.frame_id = frame_id_lidar;
+    boundary_cloud_msg.header.frame_id = FRAME_ID_LIDAR;
     boundary_cloud_msg.header.stamp = this->get_clock()->now();
     boundaryCloud_pub->publish(boundary_cloud_msg);
     // visualize ROI //
