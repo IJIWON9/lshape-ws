@@ -3,6 +3,12 @@
 #include <memory>
 #include <string>
 #include <typeinfo>
+#include <fstream>
+#include <sstream>
+#include <iomanip>
+#include <filesystem>  
+
+
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <sensor_msgs/msg/nav_sat_fix.hpp>
 #include <geometry_msgs/msg/quaternion_stamped.hpp>
@@ -13,10 +19,15 @@
 #include <custom_msgs/msg/contours.hpp>
 #include <visualization_msgs/msg/marker.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
+
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2/LinearMath/Matrix3x3.h>
+
 #include <ament_index_cpp/get_package_share_directory.hpp>
+
 #include <cmath>
+
+
 
 #include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/common/pca.h>
@@ -54,10 +65,11 @@
 using std::cout;
 using std::endl;
 using namespace std::chrono_literals;
+namespace fs = std::filesystem;
 
 using namespace Clipper2Lib;
 
-// 클리퍼는 정수 기반이므로 배율 필요
+// clipper
 constexpr double scale_clipper = 1000.0;
 
 // struct OusterPointXYZIRT           //os2
@@ -507,6 +519,10 @@ public:
   double ego_x, ego_y, ego_z;
   double ego_quat_w, ego_quat_x, ego_quat_y, ego_quat_z;
   double ego_roll, ego_pitch, ego_yaw;
+
+  std::string BAG2CSV_PATH = "./csv_outputs";
+  
+  
   
 
   std::string pkg_share_dir = ament_index_cpp::get_package_share_directory("rule_based_detect");
@@ -581,6 +597,8 @@ public:
   uint DBSCAN_PTS = 4;
   float DBSCAN_EPS = 1.5;
   const std::string FRAME_ID_LIDAR = "os1_frame";
+  std::string FILE_NAME;
+  int frame = 0;
 
   PointMatrices mat_of_PC;
 
@@ -599,6 +617,9 @@ private:
 
   void config_params()
   {
+    BAG2CSV_PATH = config_data["parameters"]["BAG2CSV_PATH"].as<std::string>();
+    FILE_NAME = config_data["parameters"]["FILE_NAME"].as<std::string>();
+
     MAPDATA_TYPE = config_data["parameters"]["MAPDATA_TYPE"].as<int>();
     MAX_RANGE = config_data["parameters"]["MAX_RANGE"].as<double>();
     MIN_RANGE = config_data["parameters"]["MIN_RANGE"].as<double>();
@@ -621,7 +642,34 @@ private:
     CONTOUR_ORTHO_MIN = config_data["parameters"]["CONTOUR_ORTHO_MIN"].as<double>();
     CONTOUR_OUTLIER_MAX = config_data["parameters"]["CONTOUR_OUTLIER_MAX"].as<double>();
   }
+  
+  void contourSegment2distanceCSV(pcl::PointCloud<pcl::PointXYZ>::Ptr& segment, const std::string& filename)
+  {
+    std::ofstream file(filename, std::ios::app);
+    if (!file.is_open()) {
+        RCLCPP_ERROR(this->get_logger(), "파일을 열 수 없습니다: %s", filename.c_str());
+        return;
+    }
+    
+    auto maxminIdx = getMaxminIdx(segment);
 
+    auto pt1 = segment->points.at(maxminIdx[0]);
+    auto pt2 = segment->points.at(maxminIdx[1]);
+    int pt_c_idx = 0;
+
+    double a = pt2.y - pt1.y;
+    double b = pt1.x - pt2.x;
+    double c = pt2.x * pt1.y - pt1.x * pt2.y;
+
+    for (int i = 0; i < segment->points.size(); i++){
+      auto& pt = segment->points.at(i);
+      double dist = std::abs(a*pt.x + b*pt.y + c) / std::sqrt(a*a + b*b);
+      file << dist;
+      if (i != segment->points.size() - 1) file << ",";
+    }
+    file << "\n";
+    file.close();
+  }
 
   double computeAreaWithClipper2(const pcl::PointCloud<pcl::PointXYZ>::ConstPtr& cloud) {
       if (cloud->size() < 3) return 0.0;

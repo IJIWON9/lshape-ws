@@ -435,8 +435,15 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContour(std::v
 }
 
 
+
 void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 {
+
+  std::stringstream filename;
+  if (!fs::exists(BAG2CSV_PATH)) {
+      fs::create_directories(BAG2CSV_PATH);
+  }
+  filename << BAG2CSV_PATH << FILE_NAME << std::setfill('0') << std::setw(5) << frame << ".csv";
 
   TimeChecker tc(false);
   tc.start("total");
@@ -495,7 +502,9 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
   std::vector<pcl::PointXYZ> line_pts; 
 
   custom_msgs::msg::Contours output_contours_msg;
-  for (auto contour : contourCloud_vector){
+  // for (auto contour : contourCloud_vector){
+  for (int i = 0; i < contourCloud_vector.size(); i++){
+    auto contour = contourCloud_vector[i];
     auto contour_seg_vec = getContourSegments(contour, line_pts);
 
     auto refl = getReflected(contour);
@@ -509,11 +518,18 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
     }
 
 
+    std::ofstream file(filename.str(), std::ios::app);
+    file << "contour" << i+1;
+    file << "\n";
+    file.close();
 
     custom_msgs::msg::ContourSegments contourSegments_msg;
     for (auto& contour_seg : contour_seg_vec){
+
+      
       if (contour_seg->points.size() == 0)
         continue;
+      contourSegment2distanceCSV(contour_seg, filename.str());
       
       sensor_msgs::msg::PointCloud2 contourSegment_msg;
       pcl::toROSMsg(*contour_seg, contourSegment_msg);
@@ -655,6 +671,7 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
     contour->clear();
   }
   
+  frame++;
 }
 
 int main(int argc, char *argv[])

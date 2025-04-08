@@ -1,4 +1,6 @@
 parameters:
+  BAG2CSV_PATH: "./bag2csv_data/multiego_bag2"
+  FILE_NAME: "/frame_"
   # ground removal
   MAPDATA_TYPE: 0
   THRESHOLD_dM: 0.5
