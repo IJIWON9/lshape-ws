@@ -5,9 +5,9 @@ from collections import defaultdict
 
 # ====== 사용자 지정 ======
 CSV_FOLDER = "./bag2csv_data/multiego_bag2/"  # CSV 경로
-X_LIM = (0, 30)                               # x축 범위
+X_LIM = (0, 50)                               # x축 범위
 Y_LIM = (-2.0, 2.0)                            # y축 범위
-TARGET_FRAME_ID = "00003"                     # 🎯 보고 싶은 Frame ID
+TARGET_FRAME_ID = "00486"                     # 🎯 보고 싶은 Frame ID
 # ==========================
 
 def parse_csv_with_contours(filepath):

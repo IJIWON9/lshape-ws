@@ -30,6 +30,6 @@ parameters:
   BAG_NAME: "/multiego_bag2"
 
   # bin publisher
-  FRAME_ID: 3
+  FRAME_ID: 486
   RATE: 10
 
