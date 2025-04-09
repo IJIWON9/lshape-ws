@@ -663,7 +663,7 @@ private:
 
     for (int i = 0; i < segment->points.size(); i++){
       auto& pt = segment->points.at(i);
-      double dist = std::abs(a*pt.x + b*pt.y + c) / std::sqrt(a*a + b*b);
+      double dist = (a*pt.x + b*pt.y + c) / std::sqrt(a*a + b*b);
       file << dist;
       if (i != segment->points.size() - 1) file << ",";
     }

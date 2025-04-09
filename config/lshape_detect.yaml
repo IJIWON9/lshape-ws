@@ -26,4 +26,10 @@ parameters:
 
 
   # pcd2bin
-  
+  FOLDER_NAME: "/../../../../bag2bin_data"
+  BAG_NAME: "/multiego_bag2"
+
+  # bin publisher
+  FRAME_ID: 3
+  RATE: 10
+

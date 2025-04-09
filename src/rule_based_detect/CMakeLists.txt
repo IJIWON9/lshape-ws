@@ -116,28 +116,13 @@ ament_target_dependencies(contour_classifier
   pcl_conversions
 )
 
-# pcd2bin_node
-add_executable(pcd2bin_node src/pcd2bin_node.cpp)
-target_include_directories(pcd2bin_node PUBLIC
-  include
-  ${PCL_INCLUDE_DIRS}
-)
-target_link_libraries(pcd2bin_node
-  ${PCL_LIBRARIES}
-  yaml-cpp
-)
-ament_target_dependencies(pcd2bin_node
-  ${ROS_DEPENDENCY_LIST}
-  PCL
-  pcl_conversions
-)
+
 
 ### Install targets
 install(TARGETS
   rule_based_detection
   lshape_detect
   contour_classifier
-  pcd2bin_node
   DESTINATION lib/${PROJECT_NAME}
 )
 

@@ -3,11 +3,11 @@ import glob
 import matplotlib.pyplot as plt
 from collections import defaultdict
 
-
 # ====== 사용자 지정 ======
-CSV_FOLDER = "./bag2csv_data/multiego_bag2/"   # 여기 경로 수정
-X_LIM = (0, 20)              # x축 고정 범위
-Y_LIM = (0.0, 2.0)            # y축 고정 범위
+CSV_FOLDER = "./bag2csv_data/multiego_bag2/"  # CSV 경로
+X_LIM = (0, 30)                               # x축 범위
+Y_LIM = (-2.0, 2.0)                            # y축 범위
+TARGET_FRAME_ID = "00003"                     # 🎯 보고 싶은 Frame ID
 # ==========================
 
 def parse_csv_with_contours(filepath):
@@ -29,7 +29,6 @@ def parse_csv_with_contours(filepath):
                 except ValueError:
                     print(f"⚠️ 파싱 실패: {line}")
 
-    # 평탄화하면서 각 segment의 index 정보도 포함시킴
     flattened = []
     for contour, segments in contour_to_segments.items():
         total = len(segments)
@@ -46,7 +45,14 @@ def visualize_all_segments_on_key():
         print("📂 지정 폴더에 CSV 파일이 없습니다.")
         return
 
-    for filepath in csv_files:
+    # 🎯 Frame ID 필터링
+    target_files = [f for f in csv_files if TARGET_FRAME_ID in os.path.basename(f)]
+
+    if not target_files:
+        print(f"❌ '{TARGET_FRAME_ID}' 를 포함하는 파일이 없습니다.")
+        return
+
+    for filepath in target_files:
         segments = parse_csv_with_contours(filepath)
         all_segments.extend(segments)
 
@@ -54,7 +60,7 @@ def visualize_all_segments_on_key():
         print("⚠️ 시각화할 segment 데이터가 없습니다.")
         return
 
-    print(f"🎉 총 {len(all_segments)} 개 segment를 시각화합니다!")
+    print(f"🎯 Frame ID '{TARGET_FRAME_ID}' 에 해당하는 {len(all_segments)}개 segment 시각화 시작!")
 
     for idx, (filename, contour, seg_idx, seg_total, distances) in enumerate(all_segments):
         fig, ax = plt.subplots()
@@ -64,7 +70,6 @@ def visualize_all_segments_on_key():
         ax.set_ylabel("Distance")
         ax.grid(True)
 
-        # x/y 축 고정 (필요시 수정)
         ax.set_xlim(X_LIM)
         ax.set_ylim(Y_LIM)
 

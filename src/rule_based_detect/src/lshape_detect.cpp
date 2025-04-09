@@ -274,19 +274,23 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContourSegment
   if (is_symmetric){
     // cout << "!! symmetric contour :: orth : " << is_orth << endl;
     if (!is_orth){
+      cout << "** symmetric ** " << endl;
       contour_segments.push_back(contourCloud);
     }else{
+      cout << "** symmetric & orth ** " << endl;
       seperateContour(contourCloud, c_pt_angle, contour_segments);
     }
   }
   else{
-    // cout << "@@ asymmetric contour" << endl;
+    cout << "** asymmetric ** " << endl;
     seperateContour(contourCloud, c_pt_angle, contour_segments);
   }
   // for (auto segments : contour_segments){
   //   auto [_, is_symmetric_seg] = isSymmetric(getReflected(segments));
   //   cout << "**** segment symmetric : " << is_symmetric_seg << endl;
   // }
+  cout << " pos : " << contourCloud->points.at(0).x << " , " << contourCloud->points.at(0).y << endl;
+  cout << "size : " << contour_segments.size() << endl;
   
   return contour_segments;
 }
@@ -455,6 +459,8 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
   nongroundCloud->clear();
   contourCloud->clear();
   pcl::fromROSMsg(*msg, *rawCloud);
+
+  
   
   tc.start("ground_removal");
   init_matrices(mat_of_PC);
@@ -518,10 +524,10 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
     }
 
 
-    std::ofstream file(filename.str(), std::ios::app);
-    file << "contour" << i+1;
-    file << "\n";
-    file.close();
+    // std::ofstream file(filename.str(), std::ios::app);
+    // file << "contour" << i+1;
+    // file << "\n";
+    // file.close();
 
     custom_msgs::msg::ContourSegments contourSegments_msg;
     for (auto& contour_seg : contour_seg_vec){
@@ -529,7 +535,7 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
       
       if (contour_seg->points.size() == 0)
         continue;
-      contourSegment2distanceCSV(contour_seg, filename.str());
+      // contourSegment2distanceCSV(contour_seg, filename.str());
       
       sensor_msgs::msg::PointCloud2 contourSegment_msg;
       pcl::toROSMsg(*contour_seg, contourSegment_msg);
