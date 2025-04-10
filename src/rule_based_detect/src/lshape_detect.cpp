@@ -211,6 +211,7 @@ bool LShapeDetect::isOrthogonal(pcl::PointXYZ pt1, pcl::PointXYZ pt2, pcl::Point
   cos_theta = std::clamp(cos_theta, 0.0, 1.0); 
 
   double angle_deg = std::acos(cos_theta) * 180.0 / M_PI;
+  cout << angle_deg << endl;
 
   return (angle_deg > CONTOUR_ORTHO_MIN);
 }
@@ -443,11 +444,11 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContour(std::v
 void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 {
 
-  std::stringstream filename;
-  if (!fs::exists(BAG2CSV_PATH)) {
-      fs::create_directories(BAG2CSV_PATH);
-  }
-  filename << BAG2CSV_PATH << FILE_NAME << std::setfill('0') << std::setw(5) << frame << ".csv";
+  // std::stringstream filename;
+  // if (!fs::exists(BAG2CSV_PATH)) {
+  //     fs::create_directories(BAG2CSV_PATH);
+  // }
+  // filename << BAG2CSV_PATH << FILE_NAME << std::setfill('0') << std::setw(5) << frame << ".csv";
 
   TimeChecker tc(false);
   tc.start("total");

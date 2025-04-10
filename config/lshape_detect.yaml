@@ -21,15 +21,15 @@ parameters:
   SYMMETRIC_MAX_AREA: 0.56
   CONTOUR_MIN_AREA: 0.01
   CONTOUR_MAX_AREA: 1.5
-  CONTOUR_ORTHO_MIN: 75
+  CONTOUR_ORTHO_MIN: 70
   CONTOUR_OUTLIER_MAX: 0.9
 
 
   # pcd2bin
   FOLDER_NAME: "/../../../../bag2bin_data"
-  BAG_NAME: "/multiego_bag2"
+  BAG_NAME: "/multiego_bag3"
 
   # bin publisher
-  FRAME_ID: 486
+  FRAME_ID: 125
   RATE: 10
 

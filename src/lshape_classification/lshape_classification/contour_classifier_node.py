@@ -17,7 +17,9 @@ class ContourProcessor(Node):
             10
         )
         self.bin_resolution = 0.05  # 5cm
-        self.max_distance = 3.0     # 3m
+        self.max_distance = 4.7     # 4.71m
+
+        self.ylim = 0.5
 
     def listener_callback(self, msg):
         for contour_idx, segment in enumerate(msg.contours):
@@ -25,9 +27,10 @@ class ContourProcessor(Node):
                 points = self.pointcloud2_to_array(pc_msg)
                 if len(points) < 2:
                     continue
+                points = remove_outliers_by_curvature(points, threshold=0.3)
                 distances = self.process_segment(points)
-                self.get_logger().info(
-                    f'Contour {contour_idx}, Segment {seg_idx} - Distances Length: {len(distances)}')
+                # self.get_logger().info(
+                #     f'Contour {contour_idx}, Segment {seg_idx} - Distances Length: {len(distances)}')
                 self.visualize(distances, contour_idx, seg_idx)
 
     def pointcloud2_to_array(self, cloud_msg):
@@ -41,13 +44,14 @@ class ContourProcessor(Node):
         p0, p1 = max_distance_point_pair(points)
         direction = p1 - p0
         length = np.linalg.norm(direction)
+        print("length : ", length, ", pos : ", (self.max_distance - length) / 2, ", ", self.max_distance - (self.max_distance - length) / 2)
         if length == 0:
             return np.zeros(int(self.max_distance / self.bin_resolution) + 1)
         unit_dir = direction / length
 
-        # 2. 직선에 수직 거리 + 투영 길이 계산
-        distances = []
+        # 2. 각 점에 대해 projection 거리와 signed distance 계산
         projections = []
+        distances = []
         for pt in points:
             vec = pt - p0
             proj = np.dot(vec, unit_dir)
@@ -55,9 +59,10 @@ class ContourProcessor(Node):
             projections.append(proj)
             distances.append(dist)
 
-        # 3. 유효 구간 추출
         projections = np.array(projections)
         distances = np.array(distances)
+
+        # 3. 유효한 projection 범위만 사용
         valid_mask = (projections >= 0.0) & (projections <= self.max_distance)
         if not np.any(valid_mask):
             return np.zeros(int(self.max_distance / self.bin_resolution) + 1)
@@ -65,26 +70,32 @@ class ContourProcessor(Node):
         projections = projections[valid_mask]
         distances = distances[valid_mask]
 
-        # 4. interpolation
-        bin_edges = np.arange(0.0, self.max_distance + self.bin_resolution, self.bin_resolution)
-        interpolated = np.interp(bin_edges, projections, distances, left=0.0, right=0.0)
+        # 4. 실제 유효 구간에서만 interpolation
+        valid_start = projections.min()
+        valid_end = projections.max()
+        valid_bins = np.arange(valid_start, valid_end + self.bin_resolution, self.bin_resolution)
+        interpolated = np.interp(valid_bins, projections, distances, left=0.0, right=0.0)
 
-        # 5. 중앙 정렬 padding (x축 기준)
-        full_length = len(bin_edges)
-        valid_length = len(projections)
-
-        pad_target_length = len(projections)  # 입력 유효 구간 크기 기준
-        pad_start_idx = (full_length - pad_target_length) // 2
-
+        # 5. 전체 bin 배열에서 중앙정렬 패딩
+        full_length = int(self.max_distance / self.bin_resolution) + 1  # 예: 61
         padded = np.zeros(full_length)
-        valid_interp = np.interp(
-            np.linspace(0.0, self.max_distance, pad_target_length),
-            projections, distances,
-            left=0.0, right=0.0
-        )
-        padded[pad_start_idx:pad_start_idx + pad_target_length] = valid_interp
+        center_idx = full_length // 2
+        valid_len = len(interpolated)
 
-        return padded
+        start_idx = center_idx - valid_len // 2
+        end_idx = start_idx + valid_len
+
+        # 범위 초과 방지
+        if start_idx < 0:
+            interpolated = interpolated[-start_idx:]
+            start_idx = 0
+        if end_idx > full_length:
+            interpolated = interpolated[:full_length - start_idx]
+            end_idx = start_idx + len(interpolated)
+
+        padded[start_idx:end_idx] = interpolated
+        smoothed = moving_average_smoothing(padded, window_size=5)
+        return smoothed
 
     def visualize(self, distance_array, contour_idx, segment_idx):
         fig, ax = plt.subplots(figsize=(10, 3))
@@ -93,11 +104,35 @@ class ContourProcessor(Node):
         ax.set_title(f"Contour {contour_idx}, Segment {segment_idx} - Signed Distances (X-Centered)")
         ax.set_xlabel("Position Along Segment (m)")
         ax.set_ylabel("Signed Distance (m)")
-        ax.set_ylim(-1.0, 1.0)
+        ax.set_ylim(-self.ylim, self.ylim)
         ax.grid(True)
         plt.tight_layout()
         plt.show()
 
+def remove_outliers_by_curvature(points, threshold=0.2):
+    cleaned = [points[0]]
+    for i in range(1, len(points) - 1):
+        prev_pt = points[i - 1]
+        curr_pt = points[i]
+        next_pt = points[i + 1]
+
+        # 앞뒤 점을 잇는 선과 현재 점의 거리 계산
+        dist = point_to_line_distance(prev_pt, next_pt, curr_pt)
+        if dist < threshold:
+            cleaned.append(curr_pt)  # 기준 이내면 유지
+    cleaned.append(points[-1])
+    return np.array(cleaned)
+
+def point_to_line_distance(p1, p2, p):
+    a = p2[1] - p1[1]
+    b = p1[0] - p2[0]
+    c = p2[0]*p1[1] - p1[0]*p2[1]
+    return abs(a*p[0] + b*p[1] + c) / np.sqrt(a**2 + b**2)
+
+def moving_average_smoothing(data, window_size=5):
+    if window_size < 2:
+        return data
+    return np.convolve(data, np.ones(window_size)/window_size, mode='same')
 # --- 수직 거리 계산 (ax + by + c 방식) ---
 def signed_distance_from_line_ab(pt1, pt2, pt):
     a = pt2[1] - pt1[1]
