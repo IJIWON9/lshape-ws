@@ -148,6 +148,60 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr LShapeDetect::removeOutlier(pcl::PointCloud<
   // obj_contour->points.assign(filtered.begin(), filtered.end());
   return filtered;
 }
+pcl::PointCloud<pcl::PointXYZ>::Ptr LShapeDetect::removeOutlierCurvatureBased(
+  pcl::PointCloud<pcl::PointXYZ>::Ptr obj_contour,
+  std::vector<int>& contour_pt_idx,
+  double min_angle, double max_angle)
+{
+  pcl::PointCloud<pcl::PointXYZ>::Ptr filtered(new pcl::PointCloud<pcl::PointXYZ>);
+  size_t N = obj_contour->points.size();
+
+  // 앞 2점은 무조건 포함
+  for (size_t i = 0; i < std::min<size_t>(2, N); ++i) {
+    filtered->points.push_back(obj_contour->points[i]);
+  }
+
+  for (size_t i = 2; i < N - 2; ++i) {
+    auto& prev2 = obj_contour->points[i - 2];
+    auto& next2 = obj_contour->points[i + 2];
+    auto& curr = obj_contour->points[i];
+
+    // 직선 기준: prev2 ~ next2
+    double a = next2.y - prev2.y;
+    double b = prev2.x - next2.x;
+    double c = next2.x * prev2.y - prev2.x * next2.y;
+    double denom = std::sqrt(a * a + b * b);
+    if (denom == 0.0) {
+      filtered->points.push_back(curr);  // 평평하면 그냥 포함
+      continue;
+    }
+
+    double dist = std::abs(a * curr.x + b * curr.y + c) / denom;
+
+    // 각도 계산을 위해 angle_idx도 업데이트
+    double angle = (max_angle - min_angle > 0)
+      ? std::atan2(curr.y, curr.x)
+      : ((std::atan2(curr.y, curr.x) < 0) ? std::atan2(curr.y, curr.x) + 2 * M_PI : std::atan2(curr.y, curr.x));
+    double angle_deg = angle * (180.0 / M_PI);
+    double min_angle_deg = min_angle * (180.0 / M_PI);
+    double rel_angle = angle_deg - min_angle_deg;
+    int angle_idx = static_cast<int>(std::round(rel_angle / CONTOUR_RES));
+
+    if (dist < OUTLIER_CUR_THRESHOLD) {
+      filtered->points.push_back(curr);
+    } else {
+      contour_pt_idx[angle_idx] = -1;  // 필터링된 점
+      // std::cout << "Removed outlier at idx " << i << ", dist=" << dist << std::endl;
+    }
+  }
+
+  // 마지막 2개는 그냥 추가
+  for (size_t i = std::max<size_t>(N - 2, 2); i < N; ++i) {
+    filtered->points.push_back(obj_contour->points[i]);
+  }
+
+  return filtered;
+}
 
 void LShapeDetect::interpolateContour(pcl::PointCloud<pcl::PointXYZ>::Ptr filtered, pcl::PointCloud<pcl::PointXYZ>::Ptr cluster, int contour_n, std::vector<int>& contour_pt_idx, double average_z)
 {
@@ -429,10 +483,12 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContour(std::v
       } 
     }
 
-    auto filtered = removeOutlier(obj_contour, contour_pt_idx, min_angle, max_angle);
+    auto filtered = removeOutlierCurvatureBased(obj_contour, contour_pt_idx, min_angle, max_angle);
+    // auto filtered = removeOutlier(obj_contour, contour_pt_idx, min_angle, max_angle);
     interpolateContour(filtered, cluster, contour_n, contour_pt_idx, dbscan_obj_list[c_idx][2]);
 
 
+    // contourCloud_vector.push_back(filtered);
     contourCloud_vector.push_back(filtered);
   }
   // cout << "contours : " << contourCloud_vector.size() << endl;

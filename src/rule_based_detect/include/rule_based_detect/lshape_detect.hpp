@@ -384,6 +384,9 @@ public:
 
   void seperateContour(pcl::PointCloud<pcl::PointXYZ>::Ptr contourCloud, double corner_angle, std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& contour_segments);
   
+  pcl::PointCloud<pcl::PointXYZ>::Ptr removeOutlierCurvatureBased(pcl::PointCloud<pcl::PointXYZ>::Ptr obj_contour,
+                                                                                std::vector<int>& contour_pt_idx, double min_angle, double max_angle);
+  
   static inline double larger_angle_singlewise(double theta1, double theta2)   
   {
     double diff = fmod(theta2 - theta1, 2 * M_PI);
@@ -589,6 +592,8 @@ public:
   double CONTOUR_ORTHO_MIN = 80;
   double CONTOUR_OUTLIER_MAX = 0.5;
 
+  double OUTLIER_CUR_THRESHOLD = 0.2;
+
 
   Eigen::Isometry3d lidarPose, currPose;
 
@@ -641,6 +646,7 @@ private:
     CONTOUR_MAX_AREA = config_data["parameters"]["CONTOUR_MAX_AREA"].as<double>();
     CONTOUR_ORTHO_MIN = config_data["parameters"]["CONTOUR_ORTHO_MIN"].as<double>();
     CONTOUR_OUTLIER_MAX = config_data["parameters"]["CONTOUR_OUTLIER_MAX"].as<double>();
+    OUTLIER_CUR_THRESHOLD = config_data["parameters"]["OUTLIER_CUR_THRESHOLD"].as<double>();
   }
   
   void contourSegment2distanceCSV(pcl::PointCloud<pcl::PointXYZ>::Ptr& segment, const std::string& filename)

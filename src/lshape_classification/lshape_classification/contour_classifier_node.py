@@ -27,7 +27,7 @@ class ContourProcessor(Node):
                 points = self.pointcloud2_to_array(pc_msg)
                 if len(points) < 2:
                     continue
-                points = remove_outliers_by_curvature(points, threshold=0.3)
+                # points = remove_outliers_by_curvature(points, threshold=0.3)
                 distances = self.process_segment(points)
                 # self.get_logger().info(
                 #     f'Contour {contour_idx}, Segment {seg_idx} - Distances Length: {len(distances)}')
@@ -40,16 +40,15 @@ class ContourProcessor(Node):
         if len(points) < 2:
             return np.zeros(int(self.max_distance / self.bin_resolution) + 1)
 
-        # 1. 가장 멀리 떨어진 점 두 개 찾기
+        # 1. 가장 멀리 떨어진 두 점 찾기
         p0, p1 = max_distance_point_pair(points)
         direction = p1 - p0
         length = np.linalg.norm(direction)
-        print("length : ", length, ", pos : ", (self.max_distance - length) / 2, ", ", self.max_distance - (self.max_distance - length) / 2)
         if length == 0:
             return np.zeros(int(self.max_distance / self.bin_resolution) + 1)
         unit_dir = direction / length
 
-        # 2. 각 점에 대해 projection 거리와 signed distance 계산
+        # 2. projection 및 signed distance 계산
         projections = []
         distances = []
         for pt in points:
@@ -61,8 +60,9 @@ class ContourProcessor(Node):
 
         projections = np.array(projections)
         distances = np.array(distances)
+        print("distances :", distances)
 
-        # 3. 유효한 projection 범위만 사용
+        # 3. 유효한 projection 범위 추출
         valid_mask = (projections >= 0.0) & (projections <= self.max_distance)
         if not np.any(valid_mask):
             return np.zeros(int(self.max_distance / self.bin_resolution) + 1)
@@ -70,14 +70,32 @@ class ContourProcessor(Node):
         projections = projections[valid_mask]
         distances = distances[valid_mask]
 
-        # 4. 실제 유효 구간에서만 interpolation
         valid_start = projections.min()
         valid_end = projections.max()
-        valid_bins = np.arange(valid_start, valid_end + self.bin_resolution, self.bin_resolution)
-        interpolated = np.interp(valid_bins, projections, distances, left=0.0, right=0.0)
 
-        # 5. 전체 bin 배열에서 중앙정렬 패딩
-        full_length = int(self.max_distance / self.bin_resolution) + 1  # 예: 61
+        print(f"valid_start = {valid_start:.4f}, valid_end = {valid_end:.4f}, diff = {valid_end - valid_start:.4f}")
+
+        # 너무 짧으면 보간 불가
+        if valid_end - valid_start < self.bin_resolution * 1.5:
+            print("⚠️ valid range too small for interpolation. Returning zero array.")
+            return np.zeros(int(self.max_distance / self.bin_resolution) + 1)
+
+        # 4. interpolation (정렬 먼저!)
+        valid_bins = np.arange(valid_start, valid_end + self.bin_resolution, self.bin_resolution)
+
+        if len(valid_bins) < 2:
+            print("⚠️ valid_bins too short. Returning zero array.")
+            return np.zeros(int(self.max_distance / self.bin_resolution) + 1)
+
+        sorted_indices = np.argsort(projections)
+        projections = projections[sorted_indices]
+        distances = distances[sorted_indices]
+
+        interpolated = np.interp(valid_bins, projections, distances, left=0.0, right=0.0)
+        print("interpolated :", interpolated)
+
+        # 5. 중앙 정렬 padding
+        full_length = int(self.max_distance / self.bin_resolution) + 1
         padded = np.zeros(full_length)
         center_idx = full_length // 2
         valid_len = len(interpolated)
@@ -85,7 +103,7 @@ class ContourProcessor(Node):
         start_idx = center_idx - valid_len // 2
         end_idx = start_idx + valid_len
 
-        # 범위 초과 방지
+        # 범위 초과 시 클리핑
         if start_idx < 0:
             interpolated = interpolated[-start_idx:]
             start_idx = 0
@@ -94,7 +112,10 @@ class ContourProcessor(Node):
             end_idx = start_idx + len(interpolated)
 
         padded[start_idx:end_idx] = interpolated
+
+        # 6. 스무딩
         smoothed = moving_average_smoothing(padded, window_size=5)
+        print("smoothed :", smoothed)
         return smoothed
 
     def visualize(self, distance_array, contour_idx, segment_idx):
@@ -141,7 +162,7 @@ def signed_distance_from_line_ab(pt1, pt2, pt):
     denom = np.sqrt(a**2 + b**2)
     if denom == 0:
         return 0.0
-    return (a * pt[0] + b * pt[1] + c) / denom
+    return np.abs(a * pt[0] + b * pt[1] + c) / denom
 
 # --- 가장 멀리 떨어진 점 쌍 찾기 ---
 def max_distance_point_pair(points):
