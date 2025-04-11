@@ -17,8 +17,8 @@ namespace fs = std::filesystem;
 class StaticFramePublisher : public rclcpp::Node
 {
 public:
-    StaticFramePublisher()
-        : Node("static_frame_publisher")
+    StaticFramePublisher(int frame_id)
+        : Node("static_frame_publisher"), FRAME_ID(frame_id)
     {
         config_data = YAML::LoadFile(yaml_config_path);
         config_parameters();
@@ -73,7 +73,7 @@ private:
     {
         FOLDER_NAME = config_data["parameters"]["FOLDER_NAME"].as<std::string>();
         BAG_NAME = config_data["parameters"]["BAG_NAME"].as<std::string>();
-        FRAME_ID = config_data["parameters"]["FRAME_ID"].as<int>();
+        // FRAME_ID = config_data["parameters"]["FRAME_ID"].as<int>();
         RATE = config_data["parameters"]["RATE"].as<double>();
     }
 
@@ -159,7 +159,11 @@ private:
 int main(int argc, char** argv)
 {
     rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<StaticFramePublisher>());
+    int frame_id = 0;
+    if (argc > 1) {
+        frame_id = std::stoi(argv[1]);
+    }
+    rclcpp::spin(std::make_shared<StaticFramePublisher>(frame_id));
     rclcpp::shutdown();
     return 0;
 }

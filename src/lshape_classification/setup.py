@@ -20,7 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'contour_classifier_node = lshape_classification.contour_classifier_node:main',
+            'contour_processor = lshape_classification.contour_processor:main',
         ],
     },
 )
