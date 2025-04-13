@@ -156,20 +156,20 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr LShapeDetect::removeOutlierCurvatureBased(
   pcl::PointCloud<pcl::PointXYZ>::Ptr filtered(new pcl::PointCloud<pcl::PointXYZ>);
   size_t N = obj_contour->points.size();
 
-  // 앞 2점은 무조건 포함
-  for (size_t i = 0; i < std::min<size_t>(2, N); ++i) {
-    filtered->points.push_back(obj_contour->points[i]);
+  // 앞 1점은 무조건 포함
+  if (N > 0) {
+    filtered->points.push_back(obj_contour->points[0]);
   }
 
-  for (size_t i = 2; i < N - 2; ++i) {
-    auto& prev2 = obj_contour->points[i - 2];
-    auto& next2 = obj_contour->points[i + 2];
+  for (size_t i = 1; i < N - 1; ++i) {
+    auto& prev = obj_contour->points[i - 1];
+    auto& next = obj_contour->points[i + 1];
     auto& curr = obj_contour->points[i];
 
-    // 직선 기준: prev2 ~ next2
-    double a = next2.y - prev2.y;
-    double b = prev2.x - next2.x;
-    double c = next2.x * prev2.y - prev2.x * next2.y;
+    // 직선 기준: prev ~ next
+    double a = next.y - prev.y;
+    double b = prev.x - next.x;
+    double c = next.x * prev.y - prev.x * next.y;
     double denom = std::sqrt(a * a + b * b);
     if (denom == 0.0) {
       filtered->points.push_back(curr);  // 평평하면 그냥 포함
@@ -178,7 +178,7 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr LShapeDetect::removeOutlierCurvatureBased(
 
     double dist = std::abs(a * curr.x + b * curr.y + c) / denom;
 
-    // 각도 계산을 위해 angle_idx도 업데이트
+    // 각도 계산 및 인덱스
     double angle = (max_angle - min_angle > 0)
       ? std::atan2(curr.y, curr.x)
       : ((std::atan2(curr.y, curr.x) < 0) ? std::atan2(curr.y, curr.x) + 2 * M_PI : std::atan2(curr.y, curr.x));
@@ -195,9 +195,9 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr LShapeDetect::removeOutlierCurvatureBased(
     }
   }
 
-  // 마지막 2개는 그냥 추가
-  for (size_t i = std::max<size_t>(N - 2, 2); i < N; ++i) {
-    filtered->points.push_back(obj_contour->points[i]);
+  // 마지막 1점 무조건 추가
+  if (N > 1) {
+    filtered->points.push_back(obj_contour->points[N - 1]);
   }
 
   return filtered;

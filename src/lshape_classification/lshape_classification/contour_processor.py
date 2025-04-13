@@ -32,14 +32,23 @@ class ContourLabeler:
         self.radio = RadioButtons(self.rax, self.class_names)
         self.radio.on_clicked(self._on_label_selected)
 
+        self.fig.canvas.mpl_connect("key_press_event", self._on_key_press)
+
+        self._plot()
+        plt.show()
+
         self._plot()
         plt.show()
 
     def _plot(self):
+        if not plt.fignum_exists(self.fig.number):
+            print("⚠️ Figure already closed. Skipping plot.")
+            return
+    
         self.ax.clear()
         x = np.linspace(0, 4.7, len(self.distance_array))
         self.ax.plot(x, self.distance_array, marker='o')
-        self.ax.set_ylim(-1.0, 1.0)
+        self.ax.set_ylim(-0.8, 0.8)
         idx = self.meta_info.get("contour_idx", -1)
         seg = self.meta_info.get("segment_idx", -1)
         remaining = self.total_segments - self.current_idx
@@ -61,6 +70,12 @@ class ContourLabeler:
         print(f"Saved: {file_id} -> {label}")
         self.current_idx += 1
         plt.close()
+    
+    def _on_key_press(self, event):
+    # 예: q를 누르면 창 닫기
+        if event.key == 'q':
+            print("🔴 [Q] pressed: Closing labeling window.")
+            plt.close()
 
 class ContourProcessor(Node):
     def __init__(self):

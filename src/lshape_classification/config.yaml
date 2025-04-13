@@ -1,0 +1,5 @@
+input_length: 95
+num_classes: 3
+batch_size: 32
+epochs: 20
+learning_rate: 0.001
