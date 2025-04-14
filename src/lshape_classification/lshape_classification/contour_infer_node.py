@@ -98,7 +98,13 @@ class InferenceNode(Node):
         for pt in points:
             vec = pt - p0
             proj = np.dot(vec, unit_dir)
-            dist = self.signed_distance_from_line_ab(p0, p1, pt)
+            range = np.hypot(pt[0], pt[1])
+            if (range < 10):
+                dist_weight = 1
+            else:
+                dist_weight = 1 + 4 * range/100
+            dist = self.signed_distance_from_line_ab(p0, p1, pt) * dist_weight
+            # dist = self.signed_distance_from_line_ab(p0, p1, pt)
             projections.append(proj)
             distances.append(dist)
         projections = np.array(projections)
