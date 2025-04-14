@@ -48,7 +48,7 @@ class ContourLabeler:
         self.ax.clear()
         x = np.linspace(0, 4.7, len(self.distance_array))
         self.ax.plot(x, self.distance_array, marker='o')
-        self.ax.set_ylim(-0.8, 0.8)
+        self.ax.set_ylim(-8, 8)
         idx = self.meta_info.get("contour_idx", -1)
         seg = self.meta_info.get("segment_idx", -1)
         remaining = self.total_segments - self.current_idx
@@ -132,11 +132,8 @@ class ContourProcessor(Node):
             vec = pt - p0
             proj = np.dot(vec, unit_dir)
             range = np.hypot(pt[0], pt[1])
-            if (range < 10):
-                dist_weight = 1
-            else:
-                dist_weight = 1 + 4 * range/100
-            dist = signed_distance_from_line_ab(p0, p1, pt) * dist_weight
+            dist_weight = 1 + 8 * range/100
+            dist = signed_distance_from_line_ab(p0, p1, pt) * dist_weight * 10
             # dist = signed_distance_from_line_ab(p0, p1, pt)
             projections.append(proj)
             distances.append(dist)
@@ -178,8 +175,8 @@ class ContourProcessor(Node):
             end_idx = start_idx + len(interpolated)
 
         padded[start_idx:end_idx] = interpolated
-        smoothed = moving_average_smoothing(padded, window_size=5)
-        return smoothed
+        # smoothed = moving_average_smoothing(padded, window_size=5)
+        return padded
 
 def remove_outliers_by_curvature(points, threshold=0.2):
     cleaned = [points[0]]

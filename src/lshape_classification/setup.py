@@ -1,5 +1,5 @@
 from setuptools import setup
-
+from glob import glob
 package_name = 'lshape_classification'
 
 setup(
@@ -10,6 +10,7 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        (f'share/{package_name}/weights', ['weights/svm_model.pkl']),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
