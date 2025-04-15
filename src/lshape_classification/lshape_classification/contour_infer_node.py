@@ -4,72 +4,231 @@ import struct
 import joblib
 from ament_index_python.packages import get_package_share_directory
 from scipy.stats import skew, kurtosis
+import time
 
 
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import PointCloud2
 from custom_msgs.msg import Contours
+from visualization_msgs.msg import Marker, MarkerArray
+from geometry_msgs.msg import Point
+from builtin_interfaces.msg import Duration
+
+
 
 class SVMInferenceNode(Node):
     def __init__(self):
         super().__init__('contour_svm_inference_node')
 
-        self.subscription = self.create_subscription(
+        self.contour_sub = self.create_subscription(
             Contours,
             '/lshape_detect/outputContours',
             self.listener_callback,
             10
         )
 
+        self.marker_pub = self.create_publisher(MarkerArray, '/lshape_classification/output', 10)
+
         # SVM 모델 로드
         package_path = get_package_share_directory('lshape_classification')
-        model_path = os.path.join(package_path, 'weights', 'svm_model.pkl')
+        model_path = os.path.join(package_path, 'weights', 'svm_model_1000.pkl')
         self.model = joblib.load(model_path)
+
+        self.unknown_prob_th = 0.6
 
         self.class_names = ['Bumper', 'SidePanel']
         self.bin_resolution = 0.05
         self.max_distance = 4.7
         self.input_length = int(self.max_distance / self.bin_resolution) + 1
-        self.segment_counter = 0
+
+        self.half_veh_length = 4.710 / 2
+        self.half_veh_width = 1.825 / 2
 
     def listener_callback(self, msg):
-        for contour_idx, segment in enumerate(msg.contours):
-            for seg_idx, pc_msg in enumerate(segment.contour_segment):
-                points = self.pointcloud2_to_array(pc_msg)
-                if len(points) < 2:
-                    continue
-                feature = self.process_segment(points)
-                if np.all(feature == 0):
-                    continue
+        tic = time.time()
 
-               
-                vec = feature * 10.0  
-                vec = (vec - np.mean(vec)) / (np.std(vec) + 1e-6)
-                features = [
-                    np.max(vec),
-                    np.min(vec),
-                    np.mean(vec),
-                    np.std(vec),
-                    np.percentile(vec, 90),
-                    np.percentile(vec, 10),
-                    np.sum(np.abs(vec) > 0.6),
-                    np.nan_to_num(skew(vec)),       
-                    np.nan_to_num(kurtosis(vec))    
-                ]
+        obj_positions = []
+        obj_orientations = []
 
-                input_array = np.array(features).reshape(1, -1)
+        marker_array = MarkerArray()
 
-                probs = self.model.predict_proba(input_array)[0]
-                max_score = np.max(probs)
-                pred_class = np.argmax(probs)
+        for contour_idx, contour in enumerate(msg.contours):
+            segments_class, segments_probs = self.predict_segments_class(contour_idx, contour)
+            num_of_segmemts = len(segments_class)
+            if (num_of_segmemts == 0) : continue
+            elif (num_of_segmemts == 1) :                                               # only one segment
+                    fix_class = segments_class[0]
+                    segment_points = contour.contour_segment[0]
 
-                label = "Unknown" if max_score < 0.6 else self.class_names[pred_class]
+                    if (self.predict_pose(segment_points, fix_class) is not None):
+                        position, orientation = self.predict_pose(segment_points, fix_class)
+                        obj_positions.append(position)
+                        obj_orientations.append(orientation)
+                        marker_array.markers.append(self.getMarker(position, orientation, contour_idx))
+            else :                                                                      # seperated segment
+                if (segments_class[0] == segments_class[1] == 'Unknown'): continue
+                elif (segments_class[0] == 'Unknown' or segments_class[1] == 'Unknown'):
+                    fix_class = segments_class[0] if (segments_class[0] != 'Unknown') else segments_class[1]
+                    segment_points = contour.contour_segment[0] if (segments_class[0] != 'Unknown') else contour.contour_segment[1]
+                    if (self.predict_pose(segment_points, fix_class) is not None) :
+                        position, orientation = self.predict_pose(segment_points, fix_class)
+                        obj_positions.append(position)
+                        obj_orientations.append(orientation)
+                        marker_array.markers.append(self.getMarker(position, orientation, contour_idx))
 
-                self.get_logger().info(
-                    f"[Segment #{self.segment_counter}] Contour {contour_idx}, Segment {seg_idx} → Prediction: {label} (Score: {max_score:.2f})"
-                )
-                self.segment_counter += 1
+                elif (segments_class[0] != segments_class[1]):
+                    # fix_class = segments_class[0] if (segments_class[0] == 'Bumper') else segments_class[1]
+                    # segment_points = contour.contour_segment[0] if (segments_class[0] == 'Bumper') else contour.contour_segment[1]
+                    # position, orientation = self.predict_pose(contour.contour_segment[1], segments_class[1])
+                    position_1, orientation_1 = self.predict_pose(contour.contour_segment[0], segments_class[0])
+                    position_2, orientation_2 = self.predict_pose(contour.contour_segment[1], segments_class[1])
+                    position = (position_1 + position_2) / 2
+                    orientation = (orientation_1 + orientation_2) / 2
+                    obj_positions.append(position)
+                    obj_orientations.append(orientation)
+                    marker_array.markers.append(self.getMarker(position, orientation, contour_idx))
+                
+                # else:
+                #     if (segments_class[0] == 'Bumper'):
+                #         segments_class[0] = 'Bumper' if ([[segments_probs[0][0] > segments_probs[1][0]]]) else 'SidePanel'
+                #         segments_class[1] = 'Bumper' if ([[segments_probs[0][0] < segments_probs[1][0]]]) else 'SidePanel'
+                
+
+                
+                     
+
+        self.marker_pub.publish(marker_array)
+
+        toc = time.time()
+        # print("runtime : ", toc - tic)
+
+    def getMarker(self, position, orientation, idx):
+        marker = Marker()
+        marker.header.frame_id = "os1_frame"
+        marker.header.stamp = self.get_clock().now().to_msg()
+        marker.ns = "arrow_array"
+        marker.id = idx
+        marker.type = Marker.ARROW
+        marker.action = Marker.ADD
+
+        # 방향 벡터 정규화 후 스케일링
+        length = np.linalg.norm(orientation)
+        if length == 0:
+            orientation = np.array([1.0, 0.0])  # 기본 방향 (x+)
+        else:
+            orientation = orientation / length
+
+        arrow_length = 3.0  # 길이 조정 가능
+        end = position + orientation * arrow_length
+
+        p0 = Point(x=position[0], y=position[1], z=0.0)
+        p1 = Point(x=end[0], y=end[1], z=0.0)
+
+        marker.points = [p0, p1]
+
+        marker.scale.x = 0.3  # shaft diameter
+        marker.scale.y = 0.8  # head diameter
+        marker.scale.z = 0.5   # head length
+
+        marker.color.a = 1.0
+        marker.color.r = 1.0
+        marker.color.g = 0.8
+        marker.color.b = 0.0
+
+        marker.lifetime = Duration(sec=0, nanosec=int(0.1 * 1e9))
+
+        return marker
+
+    
+    def predict_pose(self, contour_segment, segment_class):
+
+        points = np.array(self.pointcloud2_to_array(contour_segment))
+
+        if len(points) < 2: return
+        p0, p1 = self.max_distance_point_pair(points)
+
+        direction = p1 - p0
+        length = np.linalg.norm(direction)
+        unit_dir = direction / length
+        midpoint = (p0 + p1) / 2
+        midpoint_range = np.hypot(midpoint[0], midpoint[1])
+        perp1 = np.array([-unit_dir[1], unit_dir[0]])   
+        perp2 = np.array([ unit_dir[1], -unit_dir[0]])  
+        to_outside = midpoint  
+        dot1 = np.dot(perp1, to_outside)
+        dot2 = np.dot(perp2, to_outside)
+
+        if dot1 > dot2:
+            out_normal = perp1
+        else:
+            out_normal = perp2
+
+        range = np.hypot(points[:, 0], points[:, 1])
+        min_range = np.min(range)
+        margin = midpoint_range - min_range if (midpoint_range - min_range) else 0
+
+        if (segment_class == 'Bumper'):
+            offset = self.half_veh_length - margin
+            position = midpoint + offset * out_normal
+            orientation = out_normal if (midpoint[0] > 0) else -out_normal
+            return position, orientation
+        
+        elif (segment_class == 'SidePanel'):
+            offset = self.half_veh_width
+            position = midpoint + offset * out_normal
+            forward = [1, 0]
+            dot = np.dot(forward, unit_dir)
+            orientation = unit_dir if (dot > 0) else - unit_dir
+            return position, orientation
+        
+        
+
+    def predict_segments_class(self, contour_idx, contour):
+        segments_class = []
+        segments_probs = []
+        for seg_idx, contour_segment in enumerate(contour.contour_segment):
+            points = self.pointcloud2_to_array(contour_segment)
+            if len(points) < 2:
+                continue
+            feature = self.process_segment(points)
+            if np.all(feature == 0):
+                continue
+            
+            vec = feature * 10.0  
+            vec = (vec - np.mean(vec)) / (np.std(vec) + 1e-6)
+            features = [
+                np.max(vec),
+                np.min(vec),
+                np.mean(vec),
+                np.std(vec),
+                np.percentile(vec, 90),
+                np.percentile(vec, 10),
+                np.sum(np.abs(vec) > 0.6),
+                np.nan_to_num(skew(vec)),       
+                np.nan_to_num(kurtosis(vec))    
+            ]
+
+            input_array = np.array(features).reshape(1, -1)
+
+            probs = self.model.predict_proba(input_array)[0]
+
+            max_score = np.max(probs)
+            pred_class = np.argmax(probs)
+
+            label = "Unknown" if max_score < self.unknown_prob_th else self.class_names[pred_class]
+
+            # self.get_logger().info(
+            #     f"[Contour {contour_idx}, Segment {seg_idx} → Prediction: {label} (Score: {max_score:.2f})"
+            # )
+
+            segments_class.append(label)
+            segments_probs.append(probs)
+
+        # self.get_logger().info(f"[Contour {contour_idx}, {segments_class}, {segments_probs}")
+        print(f"[Contour {contour_idx}, {segments_class}, {segments_probs}")
+
+        return segments_class, segments_probs
 
     def pointcloud2_to_array(self, cloud_msg):
         fmt = self._get_struct_fmt(cloud_msg)
