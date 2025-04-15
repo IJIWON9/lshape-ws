@@ -43,8 +43,8 @@ class SVMInferenceNode(Node):
                 if np.all(feature == 0):
                     continue
 
-                # 👉 Feature 추출 (SVM용)
-                vec = feature * 10.0  # CNN과 동일하게 증폭
+               
+                vec = feature * 10.0  
                 vec = (vec - np.mean(vec)) / (np.std(vec) + 1e-6)
                 features = [
                     np.max(vec),
@@ -54,8 +54,8 @@ class SVMInferenceNode(Node):
                     np.percentile(vec, 90),
                     np.percentile(vec, 10),
                     np.sum(np.abs(vec) > 0.6),
-                    np.nan_to_num(skew(vec)),       # 🔥 추가
-                    np.nan_to_num(kurtosis(vec))    # 🔥 추가
+                    np.nan_to_num(skew(vec)),       
+                    np.nan_to_num(kurtosis(vec))    
                 ]
 
                 input_array = np.array(features).reshape(1, -1)
