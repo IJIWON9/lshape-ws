@@ -28,7 +28,7 @@ class ContourDataset(Dataset):
                     continue
                 # 🔥 진폭 크게 만들기
                 data *= 10.0
-                # data = data / (np.max(np.abs(data)) + 1e-6)
+                data = data / (np.max(np.abs(data)) + 1e-6)
                 self.samples.append((data.astype(np.float32), label_map[label]))
 
     def __len__(self):
