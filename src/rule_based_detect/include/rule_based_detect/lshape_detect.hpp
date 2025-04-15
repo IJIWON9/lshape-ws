@@ -1138,7 +1138,7 @@ private:
           
 
         // when gap of height is too small
-        if (range_limit < 7.5)
+        if (range_limit < MIN_RANGE)
         {
           DYNAMIC_GAP = THRESHOLD_HEIGHT_GAP * 2;
         } else if (range_limit > 40.0){
