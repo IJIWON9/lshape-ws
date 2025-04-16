@@ -42,8 +42,8 @@ class SVMInferenceNode(Node):
         self.max_distance = 4.7
         self.input_length = int(self.max_distance / self.bin_resolution) + 1
 
-        self.half_veh_length = 4.710 / 2
-        self.half_veh_width = 1.825 / 2
+        self.half_veh_length = 4.6 / 2
+        self.half_veh_width = 1.8 / 2
 
     def listener_callback(self, msg):
         tic = time.time()
@@ -60,12 +60,16 @@ class SVMInferenceNode(Node):
             elif (num_of_segmemts == 1) :                                               # only one segment
                     fix_class = segments_class[0]
                     segment_points = contour.contour_segment[0]
-
                     if (self.predict_pose(segment_points, fix_class) is not None):
                         position, orientation = self.predict_pose(segment_points, fix_class)
                         obj_positions.append(position)
                         obj_orientations.append(orientation)
                         marker_array.markers.append(self.getMarker(position, orientation, contour_idx))
+                    # elif(self.predict_pose(contour.contour_segment[1], fix_class) is not None):                 # two segments but deleted one due to length
+                    #     position, orientation = self.predict_pose(contour.contour_segment[1], fix_class)
+                    #     obj_positions.append(position)
+                    #     obj_orientations.append(orientation)
+                    #     marker_array.markers.append(self.getMarker(position, orientation, contour_idx))
             else :                                                                      # seperated segment
                 if (segments_class[0] == segments_class[1] == 'Unknown'): continue
                 elif (segments_class[0] == 'Unknown' or segments_class[1] == 'Unknown'):
@@ -79,17 +83,17 @@ class SVMInferenceNode(Node):
 
                 elif (segments_class[0] != segments_class[1]):
                     #### method 1
-                    fix_class = segments_class[0] if (segments_class[0] == 'Bumper') else segments_class[1]
-                    segment_points = contour.contour_segment[0] if (segments_class[0] == 'Bumper') else contour.contour_segment[1]
-                    position, orientation = self.predict_pose(contour.contour_segment[1], segments_class[1])
+                    # fix_class = segments_class[0] if (segments_class[0] == 'Bumper') else segments_class[1]
+                    # segment_points = contour.contour_segment[0] if (segments_class[0] == 'Bumper') else contour.contour_segment[1]
+                    # position, orientation = self.predict_pose(contour.contour_segment[1], segments_class[1])
 
                     #### method 2
-                    # position_1, orientation_1 = self.predict_pose(contour.contour_segment[0], segments_class[0])
-                    # position_2, orientation_2 = self.predict_pose(contour.contour_segment[1], segments_class[1])
-                    # position = (position_1 + position_2) / 2
-                    # orientation = (orientation_1 + orientation_2) / 2
+                    position_1, orientation_1 = self.predict_pose(contour.contour_segment[0], segments_class[0])
+                    position_2, orientation_2 = self.predict_pose(contour.contour_segment[1], segments_class[1])
+                    position = (position_1 + position_2) / 2
+                    orientation = (orientation_1 + orientation_2) / 2
 
-                    
+
                     obj_positions.append(position)
                     obj_orientations.append(orientation)
                     marker_array.markers.append(self.getMarker(position, orientation, contour_idx))

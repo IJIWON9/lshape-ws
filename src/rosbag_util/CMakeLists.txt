@@ -105,6 +105,10 @@ install(TARGETS
   rosbag_box_labeler
   DESTINATION lib/${PROJECT_NAME}
 )
+install(DIRECTORY
+  launch
+  DESTINATION share/${PROJECT_NAME}/
+)
 
 
 if(BUILD_TESTING)

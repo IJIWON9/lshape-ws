@@ -57,7 +57,7 @@ private:
     {
         double x = msg->pose.pose.position.x;
         double y = msg->pose.pose.position.y;
-        double z = 0.7;  // 고정 높이
+        double z = -0.7;  // 고정 높이
 
         tf2::Quaternion q(
             msg->pose.pose.orientation.x,
@@ -83,7 +83,7 @@ private:
             json box;
             box["position"] = {{"x", label.x}, {"y", label.y}, {"z", label.z}};
             box["orientation"] = {{"yaw", label.yaw}};
-            box["size"] = {{"length", 4.5}, {"width", 1.8}, {"height", 1.5}};
+            box["size"] = {{"length", 4.6}, {"width", 1.8}, {"height", 1.4}};
             output["boxes"].push_back(box);
         }
 

@@ -20,9 +20,11 @@ using json = nlohmann::json;
 class StaticFramePublisher : public rclcpp::Node
 {
 public:
-    StaticFramePublisher(int frame_id)
-        : Node("static_frame_publisher"), FRAME_ID(frame_id)
+    StaticFramePublisher(const rclcpp::NodeOptions & options)
+        : Node("static_frame_publisher", options)
     {
+        this->get_parameter_or("frame_id", FRAME_ID, 0);
+
         config_data = YAML::LoadFile(yaml_config_path);
         config_parameters();
 
@@ -154,7 +156,7 @@ private:
 
             m.pose.position.x = box["position"]["x"];
             m.pose.position.y = box["position"]["y"];
-            m.pose.position.z = box["position"].value("z", 0.7);  // fallback
+            m.pose.position.z = box["position"].value("z", -0.7);
 
             double yaw = box["orientation"]["yaw"];
             m.pose.orientation.x = 0.0;
@@ -162,14 +164,16 @@ private:
             m.pose.orientation.z = std::sin(yaw / 2.0);
             m.pose.orientation.w = std::cos(yaw / 2.0);
 
-            m.scale.x = box["size"].value("length", 4.5);
+            m.scale.x = box["size"].value("length", 4.6);
             m.scale.y = box["size"].value("width", 1.8);
-            m.scale.z = box["size"].value("height", 1.5);
+            m.scale.z = box["size"].value("height", 1.4);
 
             m.color.a = 0.4;
             m.color.r = 0.2;
             m.color.g = 0.8;
             m.color.b = 0.2;
+
+            m.lifetime = rclcpp::Duration::from_seconds(0.2);
 
             msg->markers.push_back(m);
         }
@@ -197,11 +201,8 @@ private:
 int main(int argc, char** argv)
 {
     rclcpp::init(argc, argv);
-    int frame_id = 0;
-    if (argc > 1) {
-        frame_id = std::stoi(argv[1]);
-    }
-    rclcpp::spin(std::make_shared<StaticFramePublisher>(frame_id));
+    auto options = rclcpp::NodeOptions().allow_undeclared_parameters(true).automatically_declare_parameters_from_overrides(true);
+    rclcpp::spin(std::make_shared<StaticFramePublisher>(options));
     rclcpp::shutdown();
     return 0;
 }
