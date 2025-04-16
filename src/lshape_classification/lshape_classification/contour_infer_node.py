@@ -78,13 +78,18 @@ class SVMInferenceNode(Node):
                         marker_array.markers.append(self.getMarker(position, orientation, contour_idx))
 
                 elif (segments_class[0] != segments_class[1]):
-                    # fix_class = segments_class[0] if (segments_class[0] == 'Bumper') else segments_class[1]
-                    # segment_points = contour.contour_segment[0] if (segments_class[0] == 'Bumper') else contour.contour_segment[1]
-                    # position, orientation = self.predict_pose(contour.contour_segment[1], segments_class[1])
-                    position_1, orientation_1 = self.predict_pose(contour.contour_segment[0], segments_class[0])
-                    position_2, orientation_2 = self.predict_pose(contour.contour_segment[1], segments_class[1])
-                    position = (position_1 + position_2) / 2
-                    orientation = (orientation_1 + orientation_2) / 2
+                    #### method 1
+                    fix_class = segments_class[0] if (segments_class[0] == 'Bumper') else segments_class[1]
+                    segment_points = contour.contour_segment[0] if (segments_class[0] == 'Bumper') else contour.contour_segment[1]
+                    position, orientation = self.predict_pose(contour.contour_segment[1], segments_class[1])
+
+                    #### method 2
+                    # position_1, orientation_1 = self.predict_pose(contour.contour_segment[0], segments_class[0])
+                    # position_2, orientation_2 = self.predict_pose(contour.contour_segment[1], segments_class[1])
+                    # position = (position_1 + position_2) / 2
+                    # orientation = (orientation_1 + orientation_2) / 2
+
+                    
                     obj_positions.append(position)
                     obj_orientations.append(orientation)
                     marker_array.markers.append(self.getMarker(position, orientation, contour_idx))

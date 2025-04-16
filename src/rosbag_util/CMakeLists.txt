@@ -82,10 +82,27 @@ ament_target_dependencies(bin_pose_publisher
   pcl_conversions
 )
 
+# box labeler node
+add_executable(rosbag_box_labeler src/rosbag_box_labeler.cpp)
+target_include_directories(rosbag_box_labeler PUBLIC
+  include
+  ${PCL_INCLUDE_DIRS}
+)
+target_link_libraries(rosbag_box_labeler
+  ${PCL_LIBRARIES}
+  yaml-cpp
+)
+ament_target_dependencies(rosbag_box_labeler
+  ${ROS_DEPENDENCY_LIST}
+  PCL
+  pcl_conversions
+)
+
 ### Install targets
 install(TARGETS
   pcd2bin_node
   bin_pose_publisher
+  rosbag_box_labeler
   DESTINATION lib/${PROJECT_NAME}
 )
 

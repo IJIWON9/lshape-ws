@@ -7,12 +7,12 @@ from pathlib import Path
 import warnings
 warnings.filterwarnings("ignore")
 
-sys.path.append(os.path.join(Path(os.path.abspath(__file__)).parent.parent.parent.parent, 'src/pillar_detect'))
+sys.path.append(os.path.join(Path(os.path.abspath(__file__)).parent.parent.parent.parent, 'src/pillar_detect/'))
 
-from models.detectors.pointpillar import PointPillar
-from datasets.dataset import DatasetTemplate
-from models import load_data_to_gpu
-from configs import cfg_from_yaml_file, cfg
+from pillar_detect.models.detectors.pointpillar import PointPillar
+from pillar_detect.datasets.dataset import DatasetTemplate
+from pillar_detect.models import load_data_to_gpu
+from pillar_detect.configs import cfg_from_yaml_file, cfg
 
 import rclpy
 import rclpy.duration
@@ -53,7 +53,7 @@ class DemoDataset(DatasetTemplate):
 class PillarRosWrapper(Node):
     def __init__(self):
         super().__init__('pillar_node')
-
+        self.last_cb_time = time()
         self.configure_files()
         self.configure_lidar_topic()
 
@@ -131,6 +131,9 @@ class PillarRosWrapper(Node):
 
     
     def pcl_cb(self, msg):
+        now = time()
+        print(f"callback interval: {now - self.last_cb_time:.3f} sec")
+        self.last_cb_time = now
         self.header = msg.header
 
         self.before = time()
@@ -169,8 +172,13 @@ class PillarRosWrapper(Node):
         self.demo_dataset.points = self.pcl_np
 
         if self.pcl_np is not None:
+            before = time()
             with torch.no_grad():
                 self.inference()
+            after = time()
+            print("Inference time:", after - before)
+            print(torch.cuda.is_available())
+            print(torch.cuda.get_device_name(0))
 
 
     def inference(self):

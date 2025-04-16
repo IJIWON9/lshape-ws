@@ -18,7 +18,7 @@ from models.detectors.pointpillar import PointPillar
 from configs import cfg_from_yaml_file, cfg
 from datasets.dataset import DatasetTemplate
 from collections import defaultdict
-from utils import common_utils
+from pillar_detect.utils import common_utils
 from models import load_data_to_gpu
 
 
