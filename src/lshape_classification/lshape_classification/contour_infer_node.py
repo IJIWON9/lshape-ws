@@ -5,7 +5,7 @@ import joblib
 from ament_index_python.packages import get_package_share_directory
 from scipy.stats import skew, kurtosis
 import time
-
+from itertools import combinations
 
 import rclpy
 from rclpy.node import Node
@@ -104,6 +104,25 @@ class SVMInferenceNode(Node):
                 #         segments_class[1] = 'Bumper' if ([[segments_probs[0][0] < segments_probs[1][0]]]) else 'SidePanel'
                 
 
+        DIST_THRESH = 2.0  # meter
+        to_remove = set()
+
+        for i, j in combinations(range(len(obj_positions)), 2):
+            pos_i = obj_positions[i]
+            pos_j = obj_positions[j]
+            dist = np.linalg.norm(pos_i[:2] - pos_j[:2])  
+            if dist <= DIST_THRESH:
+                ego_dist_i = np.hypot(pos_i[0], pos_i[1])
+                ego_dist_j = np.hypot(pos_j[0], pos_j[1])
+                if ego_dist_i <= ego_dist_j:
+                    to_remove.add(j)
+                else:
+                    to_remove.add(i)
+
+        for idx in sorted(to_remove, reverse=True):
+            del obj_positions[idx]
+            del obj_orientations[idx]
+            del marker_array.markers[idx]
                 
                      
 
@@ -167,6 +186,9 @@ class SVMInferenceNode(Node):
         to_outside = midpoint  
         dot1 = np.dot(perp1, to_outside)
         dot2 = np.dot(perp2, to_outside)
+
+        if (midpoint_range > 50):
+            segment_class == 'Bumper'
 
         if dot1 > dot2:
             out_normal = perp1
