@@ -741,7 +741,7 @@ private:
   
   void slice_map_l(pcl::PointCloud<pcl::PointXYZ>::Ptr local_pcd, pcl::PointCloud<pcl::PointXYZ>::Ptr local_border, int interval, bool is_alpha)
   {
-    int front_idx = 100 / interval;
+    int front_idx = 90 / interval;
     int rear_idx = 30 / interval;
     pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
     kdtree.setInputCloud(local_pcd);
@@ -774,7 +774,7 @@ private:
   }
   void slice_map_r(pcl::PointCloud<pcl::PointXYZ>::Ptr local_pcd, pcl::PointCloud<pcl::PointXYZ>::Ptr local_border, int interval, bool is_alpha)
   {
-  int front_idx = 100 / interval;
+  int front_idx = 90 / interval;
   int rear_idx = 30 / interval;
   pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
     kdtree.setInputCloud(local_pcd);

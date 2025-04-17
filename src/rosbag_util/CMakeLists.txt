@@ -98,11 +98,17 @@ ament_target_dependencies(rosbag_box_labeler
   pcl_conversions
 )
 
+# all_frames_publisher
+add_executable(all_frames_publisher src/all_frames_publisher.cpp)
+ament_target_dependencies(all_frames_publisher ${ROS_DEPENDENCY_LIST} PCL pcl_conversions)
+target_link_libraries(all_frames_publisher ${PCL_LIBRARIES} yaml-cpp)
+
 ### Install targets
 install(TARGETS
   pcd2bin_node
   bin_pose_publisher
   rosbag_box_labeler
+  all_frames_publisher
   DESTINATION lib/${PROJECT_NAME}
 )
 install(DIRECTORY
