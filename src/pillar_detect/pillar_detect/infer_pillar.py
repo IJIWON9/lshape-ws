@@ -5,6 +5,7 @@ import os
 import sys
 from pathlib import Path
 import warnings
+import sensor_msgs_py.point_cloud2 as pc2
 warnings.filterwarnings("ignore")
 
 sys.path.append(os.path.join(Path(os.path.abspath(__file__)).parent.parent.parent.parent, 'src/pillar_detect/'))
@@ -131,21 +132,30 @@ class PillarRosWrapper(Node):
 
     
     def pcl_cb(self, msg):
-        now = time()
-        print(f"callback interval: {now - self.last_cb_time:.3f} sec")
-        self.last_cb_time = now
+
         self.header = msg.header
 
         self.before = time()
         if self.topic_name == "/os1/lidar":
-            _data = np.frombuffer(msg.data, dtype="<f,<f,<f,<f,<f,<I,<H,<B,<B,<H,<H,<I,<f,<f,<f", count=131072)
-            # _data = np.frombuffer(msg.data, dtype="<f,<f,<f,<f,<f,<I,<H,<B,<B,<H,<H", count=131072)
+            # _data = np.frombuffer(msg.data, dtype="<f,<f,<f,<f,<f,<I,<H,<B,<B,<H,<H,<I,<f,<f,<f", count=131072)
+            # # _data = np.frombuffer(msg.data, dtype="<f,<f,<f,<f,<f,<I,<H,<B,<B,<H,<H", count=131072)
 
-            pcl_np = np.zeros((131072, 4), dtype=np.float32)
-            pcl_np[:, 0] = _data['f0']
-            pcl_np[:, 1] = _data['f1']
-            pcl_np[:, 2] = _data['f2']
-            pcl_np[:, 3] = _data['f4']
+            # pcl_np = np.zeros((131072, 4), dtype=np.float32)
+            # pcl_np[:, 0] = _data['f0']
+            # pcl_np[:, 1] = _data['f1']
+            # pcl_np[:, 2] = _data['f2']
+            # pcl_np[:, 3] = _data['f4']
+
+            self.header = msg.header
+
+            points = np.array([
+                [pt[0], pt[1], pt[2]]
+                for pt in pc2.read_points(msg, field_names=["x", "y", "z"], skip_nans=True)
+            ], dtype=np.float32)
+
+            pcl_np = np.zeros((points.shape[0], 4), dtype=np.float32)
+            pcl_np[:, :3] = points
+            pcl_np[:, 3] = 1.0  # dummy intensity
             
 
         elif self.topic_name == "/os2/lidar":
@@ -176,9 +186,7 @@ class PillarRosWrapper(Node):
             with torch.no_grad():
                 self.inference()
             after = time()
-            print("Inference time:", after - before)
-            print(torch.cuda.is_available())
-            print(torch.cuda.get_device_name(0))
+
 
 
     def inference(self):

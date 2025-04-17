@@ -141,11 +141,11 @@ class SVMInferenceNode(Node):
         marker.scale.z = 0.5   # head length
 
         marker.color.a = 1.0
-        marker.color.r = 1.0
+        marker.color.r = 0.0
         marker.color.g = 0.8
-        marker.color.b = 0.0
+        marker.color.b = 0.8
 
-        marker.lifetime = Duration(sec=0, nanosec=int(0.1 * 1e9))
+        marker.lifetime = Duration(sec=0, nanosec=int(0.5 * 1e9))
 
         return marker
 

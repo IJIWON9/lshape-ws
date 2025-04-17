@@ -2,6 +2,8 @@
 #include "sensor_msgs/msg/point_cloud2.hpp"
 #include "sensor_msgs/point_cloud2_iterator.hpp"
 #include "nav_msgs/msg/odometry.hpp"
+#include "std_msgs/msg/empty.hpp"
+
 #include "visualization_msgs/msg/marker_array.hpp"
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_cloud.h>
@@ -26,6 +28,9 @@ public:
     pub_pc_ = create_publisher<sensor_msgs::msg::PointCloud2>("/os1/lidar", 10);
     pub_odom_ = create_publisher<nav_msgs::msg::Odometry>("/localization/ego_pose", 10);
     pub_marker_ = create_publisher<visualization_msgs::msg::MarkerArray>("/label_gt_markers", 10);
+    trigger_sub_ = this->create_subscription<std_msgs::msg::Empty>(
+      "/next_frame_trigger", 10,
+      std::bind(&AllFramesPublisher::publish_next, this, std::placeholders::_1));
 
     root_path_ = pkg_share_dir_ + "/../../../../bag2bin_data";
     walk_and_collect_frames();
@@ -34,9 +39,6 @@ public:
       RCLCPP_ERROR(get_logger(), "No labeled frames found.");
       rclcpp::shutdown();
     }
-
-    current_index_ = 0;
-    timer_ = this->create_wall_timer(std::chrono::milliseconds(500), std::bind(&AllFramesPublisher::publish_next, this));
   }
 
 private:
@@ -56,7 +58,7 @@ private:
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_pc_;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pub_odom_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_marker_;
-  rclcpp::TimerBase::SharedPtr timer_;
+  rclcpp::Subscription<std_msgs::msg::Empty>::SharedPtr trigger_sub_;
 
   void walk_and_collect_frames()
   {
@@ -88,7 +90,7 @@ private:
     });
   }
 
-  void publish_next()
+  void publish_next(const std_msgs::msg::Empty::SharedPtr /*msg*/)
   {
     if (current_index_ >= frames_.size()) {
       RCLCPP_INFO(get_logger(), "Finished publishing all labeled frames.");

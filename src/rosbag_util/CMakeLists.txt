@@ -103,12 +103,17 @@ add_executable(all_frames_publisher src/all_frames_publisher.cpp)
 ament_target_dependencies(all_frames_publisher ${ROS_DEPENDENCY_LIST} PCL pcl_conversions)
 target_link_libraries(all_frames_publisher ${PCL_LIBRARIES} yaml-cpp)
 
+
+add_executable(frame_trigger_node src/frame_trigger_node.cpp)
+ament_target_dependencies(frame_trigger_node rclcpp std_msgs)
+
 ### Install targets
 install(TARGETS
   pcd2bin_node
   bin_pose_publisher
   rosbag_box_labeler
   all_frames_publisher
+  frame_trigger_node
   DESTINATION lib/${PROJECT_NAME}
 )
 install(DIRECTORY
