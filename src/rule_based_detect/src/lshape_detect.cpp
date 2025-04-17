@@ -303,7 +303,8 @@ void LShapeDetect::seperateContour(pcl::PointCloud<pcl::PointXYZ>::Ptr contourCl
   pcl::PointCloud<pcl::PointXYZ>::Ptr contour_segment_2(new pcl::PointCloud<pcl::PointXYZ>);
   for (auto& pt : contourCloud->points){
     double angle = std::atan2(pt.y, pt.x);
-    if (angle > corner_angle) {contour_segment_1->points.push_back(pt);}
+    double larger = larger_angle_singlewise(angle, corner_angle);
+    if (angle == larger) {contour_segment_1->points.push_back(pt);}
     else {contour_segment_2->points.push_back(pt);}
   }
   contour_segments.push_back(contour_segment_1);
