@@ -2,6 +2,7 @@ import os
 import numpy as np
 import struct
 import joblib
+import math
 from ament_index_python.packages import get_package_share_directory
 from scipy.stats import skew, kurtosis
 import time
@@ -12,10 +13,11 @@ from rclpy.node import Node
 from sensor_msgs.msg import PointCloud2
 from custom_msgs.msg import Contours
 from visualization_msgs.msg import Marker, MarkerArray
+from custom_msgs.msg import BoundingBox, BoundingBoxArray
 from geometry_msgs.msg import Point
 from builtin_interfaces.msg import Duration
 
-
+from pillar_detect.custom_utils import *
 
 class SVMInferenceNode(Node):
     def __init__(self):
@@ -29,6 +31,7 @@ class SVMInferenceNode(Node):
         )
 
         self.marker_pub = self.create_publisher(MarkerArray, '/lshape_classification/output', 10)
+        self.bbox_vis_publisher = self.create_publisher(MarkerArray, '/lshape_classification/vis', 1)
 
         # SVM 모델 로드
         package_path = get_package_share_directory('lshape_classification')
@@ -41,11 +44,16 @@ class SVMInferenceNode(Node):
         self.bin_resolution = 0.05
         self.max_distance = 4.7
         self.input_length = int(self.max_distance / self.bin_resolution) + 1
+        self.veh_length = 4.6
+        self.veh_width = 1.8
+        self.veh_height = 1.4
+        self.veh_z = -0.7
 
-        self.half_veh_length = 4.6 / 2
-        self.half_veh_width = 1.8 / 2
+        self.half_veh_length = self.veh_length / 2
+        self.half_veh_width = self.veh_width / 2
 
     def listener_callback(self, msg):
+        self.header = msg.contours[0].contour_segment[0].header
         tic = time.time()
 
         obj_positions = []
@@ -54,6 +62,7 @@ class SVMInferenceNode(Node):
         marker_array = MarkerArray()
 
         for contour_idx, contour in enumerate(msg.contours):
+
             segments_class, segments_probs = self.predict_segments_class(contour_idx, contour)
             num_of_segmemts = len(segments_class)
             if (num_of_segmemts == 0) : continue
@@ -90,8 +99,8 @@ class SVMInferenceNode(Node):
                     #### method 2
                     position_1, orientation_1 = self.predict_pose(contour.contour_segment[0], segments_class[0])
                     position_2, orientation_2 = self.predict_pose(contour.contour_segment[1], segments_class[1])
-                    position = (position_1 + position_2) / 2
-                    orientation = (orientation_1 + orientation_2) / 2
+                    position = position_1 if (segments_class[0] == 'Bumper') else position_2
+                    orientation =  orientation_1 if (segments_class[0] == 'SidePanel') else orientation_2
 
 
                     obj_positions.append(position)
@@ -123,13 +132,24 @@ class SVMInferenceNode(Node):
             del obj_positions[idx]
             del obj_orientations[idx]
             del marker_array.markers[idx]
-                
-                     
 
+        detection_result = MarkerArray()
+        detection_result.markers = []
+        for i in range(len(obj_positions)):
+            detection_box = set_visualization_parameter(self.header)
+            detection_box.ns = str(0)
+            detection_box.id = i
+            direction = math.atan2(obj_orientations[i][1], obj_orientations[i][0])
+            bbox = np.array([obj_positions[i][0], obj_positions[i][1], self.veh_z, self.veh_length, self.veh_width, self.veh_height, direction])
+            detection_box.points = draw_box(bbox)
+            detection_box.color.r, detection_box.color.g, detection_box.color.b = float(0), float(0), float(1)
+            detection_result.markers.append(detection_box)
+                     
+        self.bbox_vis_publisher.publish(detection_result)
         self.marker_pub.publish(marker_array)
 
         toc = time.time()
-        # print("runtime : ", toc - tic)
+        print("runtime : ", toc - tic)
 
     def getMarker(self, position, orientation, idx):
         marker = Marker()
@@ -221,9 +241,17 @@ class SVMInferenceNode(Node):
         for seg_idx, contour_segment in enumerate(contour.contour_segment):
             points = self.pointcloud2_to_array(contour_segment)
             if len(points) < 2:
+                label = "Unknown"
+                probs = [0, 0]
+                segments_class.append(label)
+                segments_probs.append(probs)
                 continue
             feature = self.process_segment(points)
             if np.all(feature == 0):
+                label = "Unknown"
+                probs = [0, 0]
+                segments_class.append(label)
+                segments_probs.append(probs)
                 continue
             
             vec = feature * 10.0  

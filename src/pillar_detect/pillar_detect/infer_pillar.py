@@ -219,6 +219,7 @@ class PillarRosWrapper(Node):
             detection_box.ns = str(0)
             detection_box.id = i
             detection_box.points = draw_box(bbox)
+            print(bbox)
             detection_box.color.r, detection_box.color.g, detection_box.color.b = float(0), float(1), float(0)
 
             bbox_msg = BoundingBox()
