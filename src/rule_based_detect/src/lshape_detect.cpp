@@ -498,8 +498,15 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContour(std::v
                                                                             std::vector<std::vector<double>>& dist_angle_list)
 {
   std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> contourCloud_vector;
+  std::vector<int> basement_noise_removal;
   for (int c_idx = 0; c_idx < clusterCloud_vector.size(); c_idx++){
     auto cluster = clusterCloud_vector.at(c_idx);
+
+    if(dbscan_obj_list[c_idx][2] < -2) {
+      basement_noise_removal.push_back(c_idx);
+      continue;
+    }
+    
 
     double max_angle = std::atan2(cluster->points.at(0).y, cluster->points.at(0).x);
     double min_angle = std::atan2(cluster->points.at(0).y, cluster->points.at(0).x);
@@ -563,6 +570,10 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContour(std::v
     contourCloud_vector.push_back(filtered);
   }
   // cout << "contours : " << contourCloud_vector.size() << endl;
+  for (int rm = basement_noise_removal.size() - 1; rm >= 0; rm--){
+    dbscan_obj_list.erase(dbscan_obj_list.begin() + basement_noise_removal[rm]);
+    dist_angle_list.erase(dist_angle_list.begin() + basement_noise_removal[rm]);
+  }
   return contourCloud_vector;
 }
 

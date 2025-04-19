@@ -99,7 +99,8 @@ class SVMInferenceNode(Node):
                     #### method 2
                     position_1, orientation_1 = self.predict_pose(contour.contour_segment[0], segments_class[0])
                     position_2, orientation_2 = self.predict_pose(contour.contour_segment[1], segments_class[1])
-                    position = position_1 if (segments_class[0] == 'Bumper') else position_2
+                    # position = position_1 if (segments_class[0] == 'Bumper') else position_2
+                    position = (position_1 + position_2) / 2
                     orientation =  orientation_1 if (segments_class[0] == 'SidePanel') else orientation_2
 
 
