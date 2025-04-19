@@ -38,7 +38,7 @@ class SVMInferenceNode(Node):
         model_path = os.path.join(package_path, 'weights', 'svm_model_1000.pkl')
         self.model = joblib.load(model_path)
 
-        self.unknown_prob_th = 0.6
+        self.unknown_prob_th = 0.55
 
         self.class_names = ['Bumper', 'SidePanel']
         self.bin_resolution = 0.05
@@ -143,6 +143,7 @@ class SVMInferenceNode(Node):
             bbox = np.array([obj_positions[i][0], obj_positions[i][1], self.veh_z, self.veh_length, self.veh_width, self.veh_height, direction])
             detection_box.points = draw_box(bbox)
             detection_box.color.r, detection_box.color.g, detection_box.color.b = float(0), float(0), float(1)
+            detection_box.color.a = float(1)
             detection_result.markers.append(detection_box)
                      
         self.bbox_vis_publisher.publish(detection_result)

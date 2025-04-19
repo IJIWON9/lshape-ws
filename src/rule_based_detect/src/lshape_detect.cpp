@@ -156,11 +156,13 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr LShapeDetect::removeOutlierCurvatureBased(
   pcl::PointCloud<pcl::PointXYZ>::Ptr filtered(new pcl::PointCloud<pcl::PointXYZ>);
   size_t N = obj_contour->points.size();
 
-  // 앞 1점은 무조건 포함
+  if (N < 3)
+    return obj_contour;
+  
+  // excluding 
   if (N > 0) {
     filtered->points.push_back(obj_contour->points[0]);
   }
-
   for (size_t i = 1; i < N - 1; ++i) {
     auto& prev = obj_contour->points[i - 1];
     auto& next = obj_contour->points[i + 1];
@@ -194,7 +196,6 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr LShapeDetect::removeOutlierCurvatureBased(
       // std::cout << "Removed outlier at idx " << i << ", dist=" << dist << std::endl;
     }
   }
-
   // 마지막 1점 무조건 추가
   if (N > 1) {
     filtered->points.push_back(obj_contour->points[N - 1]);
@@ -205,6 +206,66 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr LShapeDetect::removeOutlierCurvatureBased(
 
 void LShapeDetect::interpolateContour(pcl::PointCloud<pcl::PointXYZ>::Ptr filtered, pcl::PointCloud<pcl::PointXYZ>::Ptr cluster, int contour_n, std::vector<int>& contour_pt_idx, double average_z)
 {
+  const double distance_thresh_sq = 1.5 * 1.5;
+  // 보간 전 양 끝점 노이즈 제거
+  // === 1. 앞쪽 두 유효한 인덱스 찾기 ===
+  int begin_idx1 = -1, begin_idx2 = -1;
+  for (int i = 0; i < contour_pt_idx.size(); ++i) {
+    if (contour_pt_idx[i] != -1) {
+      if (begin_idx1 == -1) begin_idx1 = i;
+      else { begin_idx2 = i; break; }
+    }
+  }
+
+  // === 2. 뒤쪽 두 유효한 인덱스 찾기 ===
+  int end_idx1 = -1, end_idx2 = -1;
+  for (int i = contour_pt_idx.size() - 1; i >= 0; --i) {
+    if (contour_pt_idx[i] != -1) {
+      if (end_idx1 == -1) end_idx1 = i;
+      else { end_idx2 = i; break; }
+    }
+  }
+
+  // === 3. 거리 확인 후 제거 ===
+  auto erase_if_far = [&](int contour_idx_to_erase) {
+    if (contour_idx_to_erase < 0 || contour_idx_to_erase >= contour_pt_idx.size()) return;
+    int cluster_idx = contour_pt_idx[contour_idx_to_erase];
+    if (cluster_idx == -1) return;
+
+    // cluster에서 해당 포인트 좌표
+    const auto& pt = cluster->points.at(cluster_idx);
+
+    // filtered에서 일치하는 포인트 삭제
+    for (auto it = filtered->points.begin(); it != filtered->points.end(); ++it) {
+      if (std::fabs(it->x - pt.x) < 1e-4 && std::fabs(it->y - pt.y) < 1e-4) {
+        filtered->points.erase(it);
+        break;
+      }
+    }
+
+    contour_pt_idx[contour_idx_to_erase] = -1;
+  };
+
+  // 앞 거리 확인
+  if (begin_idx1 != -1 && begin_idx2 != -1) {
+    const auto& pt1 = cluster->points.at(contour_pt_idx[begin_idx1]);
+    const auto& pt2 = cluster->points.at(contour_pt_idx[begin_idx2]);
+    double dx = pt1.x - pt2.x, dy = pt1.y - pt2.y;
+    if ((dx * dx + dy * dy) >= distance_thresh_sq) {
+      erase_if_far(begin_idx1); 
+    }
+  }
+
+  // 뒤 거리 확인
+  if (end_idx1 != -1 && end_idx2 != -1) {
+    const auto& pt1 = cluster->points.at(contour_pt_idx[end_idx1]);
+    const auto& pt2 = cluster->points.at(contour_pt_idx[end_idx2]);
+    double dx = pt1.x - pt2.x, dy = pt1.y - pt2.y;
+    if ((dx * dx + dy * dy) >= distance_thresh_sq) {
+      erase_if_far(end_idx1);  
+    }
+  }
+  
   // for interpolation
   std::vector<int> prev_valid_idx(contour_n, -1);
   std::vector<int> next_valid_idx(contour_n, -1);
@@ -218,6 +279,17 @@ void LShapeDetect::interpolateContour(pcl::PointCloud<pcl::PointXYZ>::Ptr filter
     if (contour_pt_idx[i] != -1) last_valid = i;
     next_valid_idx[i] = last_valid;
   }
+
+
+  // if (filtered->points.size() > 10){     // erase beging, end point only if large cluster
+  //   contour_pt_idx[0] = -1;
+  //   contour_pt_idx[contour_pt_idx.size()-1] = -1;
+  //   int idx_1 = std::max(max_angle_idx, min_angle_idx);
+  //   int idx_2 = std::min(max_angle_idx, min_angle_idx);
+  //   filtered->points.erase(filtered->points.begin() + idx_1);
+  //   filtered->points.erase(filtered->points.begin() + idx_2);
+  // }
+
 
   // interpolation
   for (int id = 0; id < contour_pt_idx.size(); id++)
@@ -437,7 +509,6 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContour(std::v
       max_angle = (larger_angle_singlewise(angle, max_angle) == angle) ? angle : max_angle;
       min_angle = (larger_angle_singlewise(angle, min_angle) == angle) ? min_angle : angle;
     }
-
     double min = std::round(min_angle * (180 / M_PI) / CONTOUR_RES);
     double max = std::round(max_angle * (180 / M_PI) / CONTOUR_RES);
     int contour_n = (max - min > 0) ? static_cast<int>(max - min + 1) : static_cast<int>(max - min + 720 + 2);
@@ -468,7 +539,6 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContour(std::v
       contour_range_check[angle_idx] = range;
       contour_pt_idx[angle_idx] = idx;
     }
-
     pcl::PointCloud<pcl::PointXYZ>::Ptr obj_contour(new pcl::PointCloud<pcl::PointXYZ>);
     for (int id = 0; id < contour_pt_idx.size(); id++)
     {
@@ -483,11 +553,11 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContour(std::v
 
       } 
     }
-
     auto filtered = removeOutlierCurvatureBased(obj_contour, contour_pt_idx, min_angle, max_angle);
     // auto filtered = removeOutlier(obj_contour, contour_pt_idx, min_angle, max_angle);
     interpolateContour(filtered, cluster, contour_n, contour_pt_idx, dbscan_obj_list[c_idx][2]);
 
+    
 
     // contourCloud_vector.push_back(filtered);
     contourCloud_vector.push_back(filtered);
@@ -543,6 +613,7 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
   }
   auto clusters = dbscan_clustering(nonground_data, clusterCloud);
 
+
   // sensor_msgs::msg::PointCloud2 cluster_cloud_msg;
   // pcl::toROSMsg(*clusterCloud, cluster_cloud_msg);
   // cluster_cloud_msg.header.frame_id = FRAME_ID_LIDAR;
@@ -551,14 +622,16 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
 
   auto dbscan_obj_list = getObjectList(nonground_data, clusters, MAPDATA_TYPE);
   tc.finish("getObjectList");
+
+
   auto clusterCloud_vector = getClusters(clusters, nonground_data);
   
   tc.start("getContour");
   auto dist_ang_list = pullClusters(clusterCloud_vector);
-  
-  auto contourCloud_vector = getContour(clusterCloud_vector, dbscan_obj_list, dist_ang_list);
-  pushClusters(contourCloud_vector, dist_ang_list);
 
+  auto contourCloud_vector = getContour(clusterCloud_vector, dbscan_obj_list, dist_ang_list);
+
+  pushClusters(contourCloud_vector, dist_ang_list);
 
 
  
