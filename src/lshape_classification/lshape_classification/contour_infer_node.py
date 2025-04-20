@@ -99,7 +99,6 @@ class SVMInferenceNode(Node):
                     #### method 2
                     position_1, orientation_1 = self.predict_pose(contour.contour_segment[0], segments_class[0])
                     position_2, orientation_2 = self.predict_pose(contour.contour_segment[1], segments_class[1])
-                    # position = position_1 if (segments_class[0] == 'Bumper') else position_2
                     position = (position_1 + position_2) / 2
                     orientation =  orientation_1 if (segments_class[0] == 'SidePanel') else orientation_2
 
@@ -108,13 +107,29 @@ class SVMInferenceNode(Node):
                     obj_orientations.append(orientation)
                     marker_array.markers.append(self.getMarker(position, orientation, contour_idx))
                 
-                # else:
-                #     if (segments_class[0] == 'Bumper'):
-                #         segments_class[0] = 'Bumper' if ([[segments_probs[0][0] > segments_probs[1][0]]]) else 'SidePanel'
-                #         segments_class[1] = 'Bumper' if ([[segments_probs[0][0] < segments_probs[1][0]]]) else 'SidePanel'
+                else:
+                    position_1, orientation_1 = self.predict_pose(contour.contour_segment[0], segments_class[0])
+                    position_2, orientation_2 = self.predict_pose(contour.contour_segment[1], segments_class[1])
+                    forward = [1, 0]
+                    ori_score = [np.dot(orientation_1, forward), np.dot(orientation_2, forward)]
+
+                    if (ori_score[0] > ori_score[1]):
+                        segments_class[1] = 'SidePanel' if (segments_class[1] == 'Bumper') else 'Bumper'
+                        position_2, orientation_2 = self.predict_pose(contour.contour_segment[1], segments_class[1])
+                    else:
+                        segments_class[0] = 'SidePanel' if (segments_class[0] == 'Bumper') else 'Bumper'
+                        position_1, orientation_1 = self.predict_pose(contour.contour_segment[0], segments_class[0])
+    
+
+                    position = position_1 if (segments_class[0] == 'Bumper') else position_2
+                    orientation =  orientation_1 if (segments_class[0] == 'SidePanel') else orientation_2
+
+                    obj_positions.append(position)
+                    obj_orientations.append(orientation)
+                    marker_array.markers.append(self.getMarker(position, orientation, contour_idx))
                 
 
-        DIST_THRESH = 2.0  # meter
+        DIST_THRESH = 3.0  # meter
         to_remove = set()
 
         for i, j in combinations(range(len(obj_positions)), 2):
@@ -144,6 +159,7 @@ class SVMInferenceNode(Node):
             bbox = np.array([obj_positions[i][0], obj_positions[i][1], self.veh_z, self.veh_length, self.veh_width, self.veh_height, direction])
             detection_box.points = draw_box(bbox)
             detection_box.color.r, detection_box.color.g, detection_box.color.b = float(0), float(0), float(1)
+            detection_box.lifetime = Duration(sec=0, nanosec=int(0.5 * 1e9))
             detection_box.color.a = float(1)
             detection_result.markers.append(detection_box)
                      

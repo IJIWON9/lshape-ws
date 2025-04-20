@@ -348,10 +348,6 @@ public:
   }
   ~LShapeDetect() {}
 
-  double get_object_local_yaw(pcl::PointCloud<pcl::PointXYZ>::Ptr local_link, std::vector<double> object);
-
-  double calculateLogCurvature(const std::vector<double>& p1, const std::vector<double>& p2, const std::vector<double>& p3);
-
   void pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
   std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> getClusters(std::vector<std::vector<uint>>& clusters, std::vector<vec3f>& nonground_data);
   

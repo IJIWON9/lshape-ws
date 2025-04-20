@@ -1,40 +1,6 @@
 #include "rule_based_detect/lshape_detect.hpp"
 
-double LShapeDetect::get_object_local_yaw(pcl::PointCloud<pcl::PointXYZ>::Ptr local_link, std::vector<double> object)
-{
-  pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
-  kdtree.setInputCloud(local_link);
-  pcl::PointXYZ searchpoint(0.0, 0.0, 0.0);
-  std::vector<int> pointIdxNKNSearch(1);
-  std::vector<float> pointNKNSquaredDistance(1);
-  kdtree.nearestKSearch(searchpoint, 1, pointIdxNKNSearch, pointNKNSquaredDistance);
 
-  auto &nearest_pt = local_link->points.at(pointIdxNKNSearch[0]);
-  auto &nearest_pt_above = local_link->points.at((local_link->points.size() + pointIdxNKNSearch[0] - 75) %local_link->points.size());
-  return std::atan2(nearest_pt_above.y - nearest_pt.y, nearest_pt_above.x - nearest_pt.x);
-}
-
-double LShapeDetect::calculateLogCurvature(const std::vector<double>& p1, const std::vector<double>& p2, const std::vector<double>& p3)
-{
-
-  double A = 0.5 * std::abs(p1[0] * (p2[1] - p3[1]) + p2[0] * (p3[1] - p1[1]) + p3[0] * (p1[1] - p2[1]));
-  double d12 = std::hypot(p2[0] - p1[0], p2[1] - p1[1]);
-  double d23 = std::hypot(p3[0] - p2[0], p3[1] - p2[1]);
-  double d31 = std::hypot(p3[0] - p1[0], p3[1] - p1[1]);
-
-  double R = (d12 * d23 * d31) / (4.0 * A);
-  // cout << "Radius : " << R << endl;
-
-  double log_d12 = std::log(d12);
-  double log_d23 = std::log(d23);
-  double log_d31 = std::log(d31);
-
-  double log_R = log_d12 + log_d23 + log_d31 - std::log(4.0 * A);
-
-  double log_K = -log_R;
-
-  return log_K;
-}
 std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getClusters(std::vector<std::vector<uint>>& clusters, std::vector<vec3f>& nonground_data)
 {
   std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clusterCloud_vector;
@@ -204,10 +170,11 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr LShapeDetect::removeOutlierCurvatureBased(
   return filtered;
 }
 
-void LShapeDetect::interpolateContour(pcl::PointCloud<pcl::PointXYZ>::Ptr filtered, pcl::PointCloud<pcl::PointXYZ>::Ptr cluster, int contour_n, std::vector<int>& contour_pt_idx, double average_z)
+void LShapeDetect::interpolateContour(pcl::PointCloud<pcl::PointXYZ>::Ptr filtered, pcl::PointCloud<pcl::PointXYZ>::Ptr cluster, int contour_n,
+                                        std::vector<int>& contour_pt_idx, double average_z)
 {
-  const double distance_thresh_sq = 1.5 * 1.5;
-  // 보간 전 양 끝점 노이즈 제거
+  const double distance_thresh_sq = 0.7 * 0.7;
+
   // === 1. 앞쪽 두 유효한 인덱스 찾기 ===
   int begin_idx1 = -1, begin_idx2 = -1;
   for (int i = 0; i < contour_pt_idx.size(); ++i) {
@@ -228,14 +195,12 @@ void LShapeDetect::interpolateContour(pcl::PointCloud<pcl::PointXYZ>::Ptr filter
 
   // === 3. 거리 확인 후 제거 ===
   auto erase_if_far = [&](int contour_idx_to_erase) {
-    if (contour_idx_to_erase < 0 || contour_idx_to_erase >= contour_pt_idx.size()) return;
+    if (contour_idx_to_erase < 0 || contour_idx_to_erase >= static_cast<int>(contour_pt_idx.size())) return;
     int cluster_idx = contour_pt_idx[contour_idx_to_erase];
-    if (cluster_idx == -1) return;
+    if (cluster_idx == -1 || cluster_idx >= static_cast<int>(cluster->points.size())) return;
 
-    // cluster에서 해당 포인트 좌표
     const auto& pt = cluster->points.at(cluster_idx);
 
-    // filtered에서 일치하는 포인트 삭제
     for (auto it = filtered->points.begin(); it != filtered->points.end(); ++it) {
       if (std::fabs(it->x - pt.x) < 1e-4 && std::fabs(it->y - pt.y) < 1e-4) {
         filtered->points.erase(it);
@@ -247,7 +212,8 @@ void LShapeDetect::interpolateContour(pcl::PointCloud<pcl::PointXYZ>::Ptr filter
   };
 
   // 앞 거리 확인
-  if (begin_idx1 != -1 && begin_idx2 != -1) {
+  if (begin_idx1 != -1 && begin_idx2 != -1 &&
+      contour_pt_idx[begin_idx1] != -1 && contour_pt_idx[begin_idx2] != -1) {
     const auto& pt1 = cluster->points.at(contour_pt_idx[begin_idx1]);
     const auto& pt2 = cluster->points.at(contour_pt_idx[begin_idx2]);
     double dx = pt1.x - pt2.x, dy = pt1.y - pt2.y;
@@ -257,7 +223,8 @@ void LShapeDetect::interpolateContour(pcl::PointCloud<pcl::PointXYZ>::Ptr filter
   }
 
   // 뒤 거리 확인
-  if (end_idx1 != -1 && end_idx2 != -1) {
+  if (end_idx1 != -1 && end_idx2 != -1 &&
+      contour_pt_idx[end_idx1] != -1 && contour_pt_idx[end_idx2] != -1) {
     const auto& pt1 = cluster->points.at(contour_pt_idx[end_idx1]);
     const auto& pt2 = cluster->points.at(contour_pt_idx[end_idx2]);
     double dx = pt1.x - pt2.x, dy = pt1.y - pt2.y;
@@ -265,8 +232,8 @@ void LShapeDetect::interpolateContour(pcl::PointCloud<pcl::PointXYZ>::Ptr filter
       erase_if_far(end_idx1);  
     }
   }
-  
-  // for interpolation
+
+  // === 보간을 위한 이전/다음 유효 인덱스 계산 ===
   std::vector<int> prev_valid_idx(contour_n, -1);
   std::vector<int> next_valid_idx(contour_n, -1);
   int last_valid = -1;
@@ -280,27 +247,16 @@ void LShapeDetect::interpolateContour(pcl::PointCloud<pcl::PointXYZ>::Ptr filter
     next_valid_idx[i] = last_valid;
   }
 
-
-  // if (filtered->points.size() > 10){     // erase beging, end point only if large cluster
-  //   contour_pt_idx[0] = -1;
-  //   contour_pt_idx[contour_pt_idx.size()-1] = -1;
-  //   int idx_1 = std::max(max_angle_idx, min_angle_idx);
-  //   int idx_2 = std::min(max_angle_idx, min_angle_idx);
-  //   filtered->points.erase(filtered->points.begin() + idx_1);
-  //   filtered->points.erase(filtered->points.begin() + idx_2);
-  // }
-
-
-  // interpolation
-  for (int id = 0; id < contour_pt_idx.size(); id++)
-  {
+  // === 보간 수행 ===
+  for (int id = 0; id < static_cast<int>(contour_pt_idx.size()); id++) {
     if (contour_pt_idx[id] == -1) {
-      if (id == 0 || id == contour_pt_idx.size() - 1) continue;
+      if (id == 0 || id == static_cast<int>(contour_pt_idx.size()) - 1) continue;
 
       int prev = prev_valid_idx[id];
       int next = next_valid_idx[id];
 
-      if (prev != -1 && next != -1 && prev < next) {
+      if (prev != -1 && next != -1 &&
+          contour_pt_idx[prev] != -1 && contour_pt_idx[next] != -1 && prev < next) {
         const auto& pt1 = cluster->points.at(contour_pt_idx[prev]);
         const auto& pt2 = cluster->points.at(contour_pt_idx[next]);
 
@@ -317,6 +273,7 @@ void LShapeDetect::interpolateContour(pcl::PointCloud<pcl::PointXYZ>::Ptr filter
     }
   }
 }
+
 bool LShapeDetect::isOrthogonal(pcl::PointXYZ pt1, pcl::PointXYZ pt2, pcl::PointXYZ pt_c)
 {
   double v1_x = pt1.x - pt_c.x;
@@ -501,12 +458,11 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContour(std::v
   std::vector<int> basement_noise_removal;
   for (int c_idx = 0; c_idx < clusterCloud_vector.size(); c_idx++){
     auto cluster = clusterCloud_vector.at(c_idx);
-
-    if(dbscan_obj_list[c_idx][2] < -2) {
+    if(dbscan_obj_list[c_idx][2] < -1.7) {
       basement_noise_removal.push_back(c_idx);
       continue;
     }
-    
+    cout << "aaaaa" << endl;
 
     double max_angle = std::atan2(cluster->points.at(0).y, cluster->points.at(0).x);
     double min_angle = std::atan2(cluster->points.at(0).y, cluster->points.at(0).x);
@@ -519,7 +475,7 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContour(std::v
     double min = std::round(min_angle * (180 / M_PI) / CONTOUR_RES);
     double max = std::round(max_angle * (180 / M_PI) / CONTOUR_RES);
     int contour_n = (max - min > 0) ? static_cast<int>(max - min + 1) : static_cast<int>(max - min + 720 + 2);
-
+    cout << "bbbbb" << endl;
     std::vector<int> contour_pt_idx(contour_n, -1);
     std::vector<int> contour_angle_check(contour_n, 0);
     std::vector<double> contour_range_check(contour_n, 0);
@@ -546,6 +502,7 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContour(std::v
       contour_range_check[angle_idx] = range;
       contour_pt_idx[angle_idx] = idx;
     }
+    cout << "ccccc" << endl;
     pcl::PointCloud<pcl::PointXYZ>::Ptr obj_contour(new pcl::PointCloud<pcl::PointXYZ>);
     for (int id = 0; id < contour_pt_idx.size(); id++)
     {
@@ -560,9 +517,12 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContour(std::v
 
       } 
     }
+    cout << "ddddd" << endl;
     auto filtered = removeOutlierCurvatureBased(obj_contour, contour_pt_idx, min_angle, max_angle);
     // auto filtered = removeOutlier(obj_contour, contour_pt_idx, min_angle, max_angle);
+    cout << "eeeee" << endl;
     interpolateContour(filtered, cluster, contour_n, contour_pt_idx, dbscan_obj_list[c_idx][2]);
+    cout << "fffff" << endl;
 
     
 
@@ -639,12 +599,12 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
   
   tc.start("getContour");
   auto dist_ang_list = pullClusters(clusterCloud_vector);
-
+  cout << "11111" << endl;
   auto contourCloud_vector = getContour(clusterCloud_vector, dbscan_obj_list, dist_ang_list);
 
   pushClusters(contourCloud_vector, dist_ang_list);
 
-
+  cout << "22222" << endl;
  
   reflectedContour -> clear(); 
   std::vector<pcl::PointXYZ> line_pts; 
@@ -664,7 +624,7 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
       pp.z = pt.z;
       reflectedContour->points.push_back(pp);
     }
-
+    cout << "33333" << endl;
 
     // std::ofstream file(filename.str(), std::ios::app);
     // file << "contour" << i+1;
