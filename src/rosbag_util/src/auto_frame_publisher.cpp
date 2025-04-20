@@ -27,7 +27,10 @@ public:
     pub_odom_ = create_publisher<nav_msgs::msg::Odometry>("/localization/ego_pose", 10);
     pub_marker_ = create_publisher<visualization_msgs::msg::MarkerArray>("/label_gt_markers", 10);
 
-    root_path_ = pkg_share_dir_ + "/../../../../bag2bin_data";
+    save_filtered_ = false;  // <-- 여기서 true면 저장, false면 filtered_data publish
+    save_root_ = "/home/mkj/lshape-ws/filtered_data";
+    pkg_share_dir_ = ament_index_cpp::get_package_share_directory("rosbag_util");
+
     walk_and_collect_frames();
 
     if (frames_.empty()) {
@@ -36,12 +39,14 @@ public:
     }
 
     current_index_ = 0;
-    timer_ = this->create_wall_timer(std::chrono::milliseconds(1000), std::bind(&AllFramesPublisher::publish_next, this));
+    timer_ = this->create_wall_timer(std::chrono::milliseconds(100), std::bind(&AllFramesPublisher::publish_next, this));
   }
 
 private:
-  std::string pkg_share_dir_ = ament_index_cpp::get_package_share_directory("rosbag_util");
+  std::string pkg_share_dir_;
   std::string root_path_;
+  std::string save_root_;
+  bool save_filtered_;
 
   struct FrameInfo {
     std::string folder;
@@ -60,21 +65,49 @@ private:
 
   void walk_and_collect_frames()
   {
-    for (const auto& dir : fs::directory_iterator(root_path_)) {
-      if (!fs::is_directory(dir)) continue;
-      std::string folder_name = dir.path().filename();
+    if (save_filtered_) {
+      root_path_ = pkg_share_dir_ + "/../../../../bag2bin_data";
+    } else {
+      root_path_ = save_root_;
+    }
 
-      for (const auto& file : fs::directory_iterator(dir.path())) {
+    frames_.clear();
+
+    if (save_filtered_) {
+      for (const auto& dir : fs::directory_iterator(root_path_)) {
+        if (!fs::is_directory(dir)) continue;
+        std::string folder_name = dir.path().filename();
+
+        for (const auto& file : fs::directory_iterator(dir.path())) {
+          std::string name = file.path().filename();
+          std::smatch match;
+          if (std::regex_match(name, match, std::regex("frame_(\\d+)\\.json"))) {
+            int id = std::stoi(match[1]);
+            FrameInfo info;
+            info.folder = folder_name;
+            info.frame_id = id;
+            info.json_path = file.path();
+            info.bin_path = dir.path().string() + "/frame_" + std::to_string(id) + ".bin";
+            info.pose_path = dir.path().string() + "/frame_" + std::to_string(id) + ".pose";
+
+            if (fs::exists(info.bin_path) && fs::exists(info.pose_path)) {
+              frames_.push_back(info);
+            }
+          }
+        }
+      }
+    } else {
+      for (const auto& file : fs::directory_iterator(root_path_)) {
         std::string name = file.path().filename();
         std::smatch match;
         if (std::regex_match(name, match, std::regex("frame_(\\d+)\\.json"))) {
           int id = std::stoi(match[1]);
           FrameInfo info;
-          info.folder = folder_name;
+          info.folder = "filtered_data";
           info.frame_id = id;
-          info.json_path = file.path();
-          info.bin_path = dir.path().string() + "/frame_" + std::to_string(id) + ".bin";
-          info.pose_path = dir.path().string() + "/frame_" + std::to_string(id) + ".pose";
+          info.json_path = root_path_ + "/frame_" + std::to_string(id) + ".json";
+          info.bin_path = root_path_ + "/frame_" + std::to_string(id) + ".bin";
+          info.pose_path = root_path_ + "/frame_" + std::to_string(id) + ".pose";
 
           if (fs::exists(info.bin_path) && fs::exists(info.pose_path)) {
             frames_.push_back(info);
@@ -84,8 +117,23 @@ private:
     }
 
     std::sort(frames_.begin(), frames_.end(), [](const FrameInfo &a, const FrameInfo &b) {
-      return a.folder == b.folder ? a.frame_id < b.frame_id : a.folder < b.folder;
+      return a.frame_id < b.frame_id;
     });
+
+    if (save_filtered_) {
+      RCLCPP_INFO(this->get_logger(), "[\u2713] Saving filtered frames to: %s", save_root_.c_str());
+      fs::create_directories(save_root_);
+
+      for (size_t new_id = 0; new_id < frames_.size(); ++new_id) {
+        const auto& frame = frames_[new_id];
+        std::string base_name = "frame_" + std::to_string(new_id);
+        fs::copy_file(frame.json_path, save_root_ + "/" + base_name + ".json", fs::copy_options::overwrite_existing);
+        fs::copy_file(frame.bin_path,  save_root_ + "/" + base_name + ".bin",  fs::copy_options::overwrite_existing);
+        fs::copy_file(frame.pose_path, save_root_ + "/" + base_name + ".pose", fs::copy_options::overwrite_existing);
+      }
+
+      RCLCPP_INFO(this->get_logger(), "[\u2713] %zu valid frames saved to %s", frames_.size(), save_root_.c_str());
+    }
   }
 
   void publish_next()
@@ -96,11 +144,6 @@ private:
     }
 
     const auto& frame = frames_[current_index_++];
-
-    if (frame.folder != current_folder_logged_) {
-      current_folder_logged_ = frame.folder;
-      RCLCPP_INFO(get_logger(), "[Folder] %s", frame.folder.c_str());
-    }
 
     RCLCPP_INFO(get_logger(), "[Frame] Publishing frame_%d", frame.frame_id);
 

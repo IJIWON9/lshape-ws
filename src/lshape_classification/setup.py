@@ -25,6 +25,7 @@ setup(
             'contour_processor = lshape_classification.contour_processor:main',
             'contour_infer_node = lshape_classification.contour_infer_node:main',
             'infer_cnn1d = lshape_classification.infer_cnn1d:main',
+            'detection_logger = lshape_classification.detection_logger:main',
             
         ],
     },
