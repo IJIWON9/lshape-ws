@@ -738,7 +738,7 @@ private:
   void slice_map_l(pcl::PointCloud<pcl::PointXYZ>::Ptr local_pcd, pcl::PointCloud<pcl::PointXYZ>::Ptr local_border, int interval, bool is_alpha)
   {
     int front_idx = 90 / interval;
-    int rear_idx = 35 / interval;
+    int rear_idx = 30 / interval;
     pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
     kdtree.setInputCloud(local_pcd);
     pcl::PointXYZ searchpoint(0.0, 0.0, 0.0);
@@ -1112,7 +1112,7 @@ private:
 
         // when number of points in grid is 0 or 1
         if (mat_of_PC.nMat(i, j) < 2){
-          if (range_limit > 60.0){
+          if (range_limit > 55.0){
             for (int k = 0; k < 3; k++){
               if (mat_of_PC.idxTen(i, j, k) != -1)
               {
@@ -1137,10 +1137,14 @@ private:
         if (range_limit < MIN_RANGE)
         {
           DYNAMIC_GAP = THRESHOLD_HEIGHT_GAP * 2;
-        } else if (range_limit > 40.0){
+        } 
+        else if (range_limit > 40.0){
           DYNAMIC_GAP = THRESHOLD_HEIGHT_GAP * 0.5;
         } else if (range_limit > 60.0){
           DYNAMIC_GAP = THRESHOLD_HEIGHT_GAP * 0.25;
+        } 
+        else {
+          DYNAMIC_GAP = THRESHOLD_HEIGHT_GAP * 1.0;
         }
         if (mat_of_PC.zmaxMat(i, j) - mat_of_PC.zminMat(i, j) < DYNAMIC_GAP)
           continue;

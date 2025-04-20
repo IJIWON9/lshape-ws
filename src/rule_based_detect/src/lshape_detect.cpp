@@ -462,7 +462,6 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContour(std::v
       basement_noise_removal.push_back(c_idx);
       continue;
     }
-    cout << "aaaaa" << endl;
 
     double max_angle = std::atan2(cluster->points.at(0).y, cluster->points.at(0).x);
     double min_angle = std::atan2(cluster->points.at(0).y, cluster->points.at(0).x);
@@ -475,7 +474,6 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContour(std::v
     double min = std::round(min_angle * (180 / M_PI) / CONTOUR_RES);
     double max = std::round(max_angle * (180 / M_PI) / CONTOUR_RES);
     int contour_n = (max - min > 0) ? static_cast<int>(max - min + 1) : static_cast<int>(max - min + 720 + 2);
-    cout << "bbbbb" << endl;
     std::vector<int> contour_pt_idx(contour_n, -1);
     std::vector<int> contour_angle_check(contour_n, 0);
     std::vector<double> contour_range_check(contour_n, 0);
@@ -502,7 +500,6 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContour(std::v
       contour_range_check[angle_idx] = range;
       contour_pt_idx[angle_idx] = idx;
     }
-    cout << "ccccc" << endl;
     pcl::PointCloud<pcl::PointXYZ>::Ptr obj_contour(new pcl::PointCloud<pcl::PointXYZ>);
     for (int id = 0; id < contour_pt_idx.size(); id++)
     {
@@ -517,12 +514,10 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContour(std::v
 
       } 
     }
-    cout << "ddddd" << endl;
     auto filtered = removeOutlierCurvatureBased(obj_contour, contour_pt_idx, min_angle, max_angle);
     // auto filtered = removeOutlier(obj_contour, contour_pt_idx, min_angle, max_angle);
-    cout << "eeeee" << endl;
     interpolateContour(filtered, cluster, contour_n, contour_pt_idx, dbscan_obj_list[c_idx][2]);
-    cout << "fffff" << endl;
+
 
     
 
@@ -599,12 +594,10 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
   
   tc.start("getContour");
   auto dist_ang_list = pullClusters(clusterCloud_vector);
-  cout << "11111" << endl;
   auto contourCloud_vector = getContour(clusterCloud_vector, dbscan_obj_list, dist_ang_list);
 
   pushClusters(contourCloud_vector, dist_ang_list);
 
-  cout << "22222" << endl;
  
   reflectedContour -> clear(); 
   std::vector<pcl::PointXYZ> line_pts; 
@@ -624,7 +617,6 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
       pp.z = pt.z;
       reflectedContour->points.push_back(pp);
     }
-    cout << "33333" << endl;
 
     // std::ofstream file(filename.str(), std::ios::app);
     // file << "contour" << i+1;

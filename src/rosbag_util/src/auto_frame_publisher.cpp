@@ -36,7 +36,7 @@ public:
     }
 
     current_index_ = 0;
-    timer_ = this->create_wall_timer(std::chrono::milliseconds(500), std::bind(&AllFramesPublisher::publish_next, this));
+    timer_ = this->create_wall_timer(std::chrono::milliseconds(1000), std::bind(&AllFramesPublisher::publish_next, this));
   }
 
 private:
@@ -162,6 +162,7 @@ private:
     for (const auto& box : j["boxes"]) {
       visualization_msgs::msg::Marker m;
       m.header.frame_id = "os1_frame";
+      m.text = std::to_string(id);
       m.header.stamp = now();
       m.ns = "gt";
       m.id = id++;
