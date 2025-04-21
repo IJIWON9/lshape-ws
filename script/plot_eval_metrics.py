@@ -2,7 +2,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 
-CSV_PATH = '/home/mkj/lshape-ws/script/eval_result.csv'
+# === 상대경로로 설정 ===
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+CSV_PATH = os.path.join(SCRIPT_DIR, 'eval_result.csv')
 
 # 프레임별 성능지표 불러오기
 def load_eval_csv(csv_path):
@@ -11,7 +13,6 @@ def load_eval_csv(csv_path):
     data[cols] = data[cols].apply(pd.to_numeric, errors='coerce')
     data = data.dropna()  # NaN 제거 (TOTAL, METRIC 줄 날림)
 
-    data = data.dropna()  # TOTAL, METRIC 제거
     data['precision'] = data['tp'] / (data['tp'] + data['fp']).replace(0, 1)
     data['recall'] = data['tp'] / (data['tp'] + data['fn']).replace(0, 1)
     data['f1'] = 2 * data['precision'] * data['recall'] / (data['precision'] + data['recall']).replace(0, 1)
@@ -31,7 +32,8 @@ def plot_metrics(data):
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
-    plt_path = os.path.join(os.path.dirname(CSV_PATH), 'eval_plot.png')
+    
+    plt_path = os.path.join(SCRIPT_DIR, 'eval_plot.png')
     plt.savefig(plt_path)
     print(f"\n[Saved] Plot saved to: {plt_path}")
     plt.show()

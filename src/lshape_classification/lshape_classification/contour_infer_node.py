@@ -197,7 +197,7 @@ class SVMInferenceNode(Node):
         marker.scale.y = 0.8  # head diameter
         marker.scale.z = 0.5   # head length
 
-        marker.color.a = 1.0
+        marker.color.a = 0.0
         marker.color.r = 0.0
         marker.color.g = 0.8
         marker.color.b = 0.8
@@ -226,7 +226,7 @@ class SVMInferenceNode(Node):
         dot2 = np.dot(perp2, to_outside)
 
         if (midpoint_range > 50):
-            segment_class == 'Bumper'
+            segment_class = 'Bumper'
 
         if dot1 > dot2:
             out_normal = perp1
@@ -250,6 +250,7 @@ class SVMInferenceNode(Node):
             dot = np.dot(forward, unit_dir)
             orientation = unit_dir if (dot > 0) else - unit_dir
             return position, orientation
+        
         
         
 

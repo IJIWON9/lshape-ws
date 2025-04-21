@@ -28,7 +28,7 @@ parameters:
 
   # pcd2bin
   FOLDER_NAME: "/../../../../bag2bin_data"
-  BAG_NAME: "/multiego_bag2"
+  BAG_NAME: "/../filtered_data"
   # BAG_NAME: "/0924_circular5"
 
   # bin publisher

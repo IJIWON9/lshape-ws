@@ -4,10 +4,12 @@ import numpy as np
 from shapely.geometry import Polygon
 from math import cos, sin
 
-# === 경로 설정 ===
-GT_DIR = '/home/mkj/lshape-ws/filtered_data'
-DET_DIR = os.path.join(GT_DIR, 'detection_json')
-RESULT_PATH = '/home/mkj/lshape-ws/script/eval_result.csv'
+# === 상대 경로 기반 디렉토리 설정 ===
+SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
+GT_DIR = os.path.join(SCRIPT_DIR, '..', 'filtered_data')
+DET_DIR = os.path.join(GT_DIR, 'pillar_detection_json')
+RESULT_PATH = os.path.join(SCRIPT_DIR, 'eval_result.csv')
+
 
 # === IoU 계산 ===
 def create_rotated_box(cx, cy, yaw, length=4.6, width=1.8):
@@ -26,7 +28,7 @@ def compute_iou(p1, p2):
     return inter / union if union > 0 else 0.0
 
 # === 평가 ===
-def evaluate():
+def evaluate(iou_th):
     frame_id = 0
     results = []
 
@@ -68,7 +70,7 @@ def evaluate():
                 if iou > best_iou:
                     best_iou = iou
                     best_j = j
-            if best_iou >= 0.5:
+            if best_iou >= iou_th:
                 matched_gt.add(i)
                 matched_det.add(best_j)
 
@@ -111,6 +113,5 @@ def evaluate():
     print(f"F1 Score      : {f1:.3f}")
     print(f"Saved to      : {RESULT_PATH}")
 
-
 if __name__ == '__main__':
-    evaluate()
+    evaluate(0.5)

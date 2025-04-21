@@ -27,8 +27,8 @@ public:
     pub_odom_ = create_publisher<nav_msgs::msg::Odometry>("/localization/ego_pose", 10);
     pub_marker_ = create_publisher<visualization_msgs::msg::MarkerArray>("/label_gt_markers", 10);
 
-    save_filtered_ = false;  // <-- 여기서 true면 저장, false면 filtered_data publish
-    save_root_ = "/home/mkj/lshape-ws/filtered_data";
+    save_filtered_ = false;
+    save_root_ = fs::current_path().string() + "/filtered_data";
     pkg_share_dir_ = ament_index_cpp::get_package_share_directory("rosbag_util");
 
     walk_and_collect_frames();
@@ -39,7 +39,7 @@ public:
     }
 
     current_index_ = 0;
-    timer_ = this->create_wall_timer(std::chrono::milliseconds(100), std::bind(&AllFramesPublisher::publish_next, this));
+    timer_ = this->create_wall_timer(std::chrono::milliseconds(1000), std::bind(&AllFramesPublisher::publish_next, this));
   }
 
 private:
@@ -116,12 +116,15 @@ private:
       }
     }
 
+    // ✅ 폴더 > frame_id 기준 정렬
     std::sort(frames_.begin(), frames_.end(), [](const FrameInfo &a, const FrameInfo &b) {
-      return a.frame_id < b.frame_id;
+      if (a.folder == b.folder)
+        return a.frame_id < b.frame_id;
+      return a.folder < b.folder;
     });
 
     if (save_filtered_) {
-      RCLCPP_INFO(this->get_logger(), "[\u2713] Saving filtered frames to: %s", save_root_.c_str());
+      RCLCPP_INFO(this->get_logger(), "[✓] Saving filtered frames to: %s", save_root_.c_str());
       fs::create_directories(save_root_);
 
       for (size_t new_id = 0; new_id < frames_.size(); ++new_id) {
@@ -132,7 +135,7 @@ private:
         fs::copy_file(frame.pose_path, save_root_ + "/" + base_name + ".pose", fs::copy_options::overwrite_existing);
       }
 
-      RCLCPP_INFO(this->get_logger(), "[\u2713] %zu valid frames saved to %s", frames_.size(), save_root_.c_str());
+      RCLCPP_INFO(this->get_logger(), "[✓] %zu valid frames saved to %s", frames_.size(), save_root_.c_str());
     }
   }
 
@@ -144,6 +147,11 @@ private:
     }
 
     const auto& frame = frames_[current_index_++];
+
+    if (frame.folder != current_folder_logged_) {
+      current_folder_logged_ = frame.folder;
+      RCLCPP_INFO(get_logger(), "[Folder] %s", current_folder_logged_.c_str());
+    }
 
     RCLCPP_INFO(get_logger(), "[Frame] Publishing frame_%d", frame.frame_id);
 
@@ -205,7 +213,6 @@ private:
     for (const auto& box : j["boxes"]) {
       visualization_msgs::msg::Marker m;
       m.header.frame_id = "os1_frame";
-      m.text = std::to_string(id);
       m.header.stamp = now();
       m.ns = "gt";
       m.id = id++;

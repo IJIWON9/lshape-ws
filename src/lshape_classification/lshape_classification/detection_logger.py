@@ -3,10 +3,8 @@ import json
 import rclpy
 from rclpy.node import Node
 from visualization_msgs.msg import MarkerArray
-import numpy as np
-
 from geometry_msgs.msg import Point
-
+import numpy as np
 
 class DetectionLogger(Node):
     def __init__(self):
@@ -19,10 +17,14 @@ class DetectionLogger(Node):
             10
         )
 
-        self.frame_id = 0
-        self.save_dir = '/home/mkj/lshape-ws/filtered_data/detection_json'
+        # 현재 파일 위치 기준 상대 경로 설정
+        script_dir = os.path.dirname(os.path.realpath(__file__))
+        self.save_dir = os.path.abspath(
+            os.path.join(script_dir, '..', '..', '..', 'filtered_data', 'detection_json')
+        )
         os.makedirs(self.save_dir, exist_ok=True)
 
+        self.frame_id = 0
         self.get_logger().info(f"[Logger] Saving detection JSON to: {self.save_dir}")
 
     def callback(self, msg):
@@ -31,20 +33,22 @@ class DetectionLogger(Node):
         for marker in msg.markers:
             if len(marker.points) < 2:
                 continue
+
             p0 = marker.points[0]
             p1 = marker.points[1]
 
             dx = p1.x - p0.x
             dy = p1.y - p0.y
             norm = (dx ** 2 + dy ** 2) ** 0.5
-            if norm == 0:
-                direction = [1.0, 0.0]
-            else:
-                direction = [dx / norm, dy / norm]
+            direction = [1.0, 0.0] if norm == 0 else [dx / norm, dy / norm]
+
+            # confidence score 추출 (0.0 ~ 1.0 범위)
+            score = marker.color.a if marker.color.a < 1 else None
 
             detections.append({
                 "position": [p0.x, p0.y],
-                "orientation": direction
+                "orientation": direction,
+                "score": score  # score가 None일 수도 있음
             })
 
         output = {

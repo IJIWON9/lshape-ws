@@ -20,7 +20,7 @@ import rclpy.duration
 from rclpy.node import Node
 from sensor_msgs.msg import PointCloud2
 from custom_msgs.msg import BoundingBox, BoundingBoxArray
-from visualization_msgs.msg import MarkerArray
+from visualization_msgs.msg import MarkerArray, Marker
 from .custom_utils import *
 from time import time
 
@@ -69,6 +69,8 @@ class PillarRosWrapper(Node):
 
         self.bbox_vis_publisher = self.create_publisher(MarkerArray, '/pillars/vis', 1)
         self.bbox_publisher = self.create_publisher(BoundingBoxArray, '/pillars/detections', 1)
+        self.arrow_publisher = self.create_publisher(MarkerArray, '/lshape_classification/output', 1)
+
 
         self.pcl_sub = self.create_subscription(
             PointCloud2,
@@ -213,6 +215,8 @@ class PillarRosWrapper(Node):
         bbox_result.header = self.header
         bbox_result.boxes = []
 
+        arrow_result = MarkerArray()
+
         for i, bbox in enumerate(lidar_bboxes):
 
             detection_box = set_visualization_parameter(self.header)
@@ -221,7 +225,8 @@ class PillarRosWrapper(Node):
             detection_box.points = draw_box(bbox)
             print(bbox)
             detection_box.color.r, detection_box.color.g, detection_box.color.b = float(0), float(1), float(0)
-
+            # if (bbox[0] < -20) :
+            #     continue
             bbox_msg = BoundingBox()
             bbox_msg.pose.position.x = float(bbox[0]) + self.translation_lidar2ego[0]
             bbox_msg.pose.position.y = float(bbox[1]) + self.translation_lidar2ego[1]
@@ -234,6 +239,34 @@ class PillarRosWrapper(Node):
             bbox_msg.pose.orientation.y = q[1]
             bbox_msg.pose.orientation.z = q[2]
             bbox_msg.pose.orientation.w = q[3]
+
+             # 새로운 Arrow Marker 생성
+            arrow_marker = Marker()
+            arrow_marker.header = self.header
+            arrow_marker.ns = "arrow"
+            arrow_marker.id = i
+            arrow_marker.type = Marker.ARROW
+            arrow_marker.action = Marker.ADD
+            arrow_marker.scale.x = 0.3 # shaft length
+            arrow_marker.scale.y = 0.8  # shaft diameter
+            arrow_marker.scale.z = 0.5  # head diameter
+            arrow_marker.color.a = float(scores[i])
+            arrow_marker.color.r = 1.0
+            arrow_marker.color.g = 0.0
+            arrow_marker.color.b = 0.0
+            arrow_marker.lifetime = rclpy.duration.Duration(seconds=0.5).to_msg()
+
+            # 위치 및 방향 계산
+            cx = float(bbox[0]) 
+            cy = float(bbox[1]) 
+            yaw = bbox[6]
+            dx = np.cos(yaw)
+            dy = np.sin(yaw)
+            arrow_length = 3.0
+            start_point = Point(x=cx, y=cy, z=0.5)
+            end_point = Point(x=cx + dx*arrow_length, y=cy + dy*arrow_length, z=0.5)
+
+            arrow_marker.points = [start_point, end_point]
             
             if abs(bbox[0]) < 2 and abs(bbox[1]) < 2:
                 pass
@@ -243,9 +276,12 @@ class PillarRosWrapper(Node):
                     bbox_msg.label = 1
                     bbox_result.boxes.append(bbox_msg)
                     detection_result.markers.append(detection_box)
+                    arrow_result.markers.append(arrow_marker)
+                    
 
         self.bbox_vis_publisher.publish(detection_result)
         self.bbox_publisher.publish(bbox_result)
+        self.arrow_publisher.publish(arrow_result) 
         
         self.after = time()
 

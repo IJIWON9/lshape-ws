@@ -4,16 +4,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 from shapely.geometry import Polygon
 from math import cos, sin, atan2
-from tqdm import tqdm
 
-GT_DIR = '/home/mkj/lshape-ws/filtered_data'
-DET_DIR = os.path.join(GT_DIR, 'detection_json')
-IOU_THRESHOLDS = [round(x / 100.0, 2) for x in range(50, 100, 5)]  # 0.50~0.95
-
+# === 상대경로 기반 설정 ===
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+GT_DIR = os.path.join(SCRIPT_DIR, '..', 'filtered_data')
+DET_DIR = os.path.join(GT_DIR, 'pillar_detection_json')
+OUTPUT_PNG = os.path.join(SCRIPT_DIR, 'PointPillar_PR_curve.png')
+IOU_THRESHOLD = 0.5  # 50% 고정
 
 def create_rotated_box(cx, cy, yaw, length=4.6, width=1.8):
-    dx = length / 2
-    dy = width / 2
+    dx, dy = length / 2, width / 2
     corners = [(-dx, -dy), (dx, -dy), (dx, dy), (-dx, dy)]
     R = np.array([[cos(yaw), -sin(yaw)], [sin(yaw), cos(yaw)]])
     transformed = [tuple(np.dot(R, [x, y]) + [cx, cy]) for x, y in corners]
@@ -26,102 +26,119 @@ def compute_iou(p1, p2):
     union = p1.union(p2).area
     return inter / union if union > 0 else 0.0
 
-
-def load_boxes(frame_id):
-    gt_path = os.path.join(GT_DIR, f'frame_{frame_id}.json')
-    det_path = os.path.join(DET_DIR, f'frame_{frame_id}.json')
-    if not os.path.exists(gt_path) or not os.path.exists(det_path):
-        return None, None
-
-    with open(gt_path) as f:
-        gt_data = json.load(f)
-    with open(det_path) as f:
-        det_data = json.load(f)
-
-    gt_boxes = [
-        create_rotated_box(
-            b['position']['x'], b['position']['y'],
-            b['orientation']['yaw'],
-            b['size'].get('length', 4.6),
-            b['size'].get('width', 1.8)
-        ) for b in gt_data['boxes']
-    ]
-
-    det_boxes = [
-        create_rotated_box(
-            b['position'][0], b['position'][1],
-            atan2(b['orientation'][1], b['orientation'][0])
-        ) for b in det_data['detections']
-    ]
-
-    return gt_boxes, det_boxes
-
-
-def calculate_pr(iou_thresh):
+def load_data():
+    detections = []
+    gt_dict = {}
     frame_id = 0
-    total_tp, total_fp, total_fn = 0, 0, 0
-
     while True:
-        gt_boxes, det_boxes = load_boxes(frame_id)
-        if gt_boxes is None:
+        gt_path = os.path.join(GT_DIR, f'frame_{frame_id}.json')
+        det_path = os.path.join(DET_DIR, f'frame_{frame_id}.json')
+        if not os.path.exists(gt_path) or not os.path.exists(det_path):
             break
 
-        matched_gt = set()
-        matched_det = set()
+        with open(gt_path) as f:
+            gt_data = json.load(f)
+        with open(det_path) as f:
+            det_data = json.load(f)
 
-        for i, gt in enumerate(gt_boxes):
-            best_iou, best_j = 0.0, -1
-            for j, det in enumerate(det_boxes):
-                if j in matched_det:
-                    continue
-                iou = compute_iou(gt, det)
-                if iou > best_iou:
-                    best_iou = iou
-                    best_j = j
-            if best_iou >= iou_thresh:
-                matched_gt.add(i)
-                matched_det.add(best_j)
+        gt_boxes = [
+            create_rotated_box(
+                b['position']['x'], b['position']['y'],
+                b['orientation']['yaw'],
+                b['size'].get('length', 4.6),
+                b['size'].get('width', 1.8)
+            ) for b in gt_data['boxes']
+        ]
+        gt_dict[frame_id] = gt_boxes
 
-        tp = len(matched_gt)
-        fp = len(det_boxes) - tp
-        fn = len(gt_boxes) - tp
-
-        total_tp += tp
-        total_fp += fp
-        total_fn += fn
+        for b in det_data['detections']:
+            score = b.get('score', None)
+            if score is None:
+                continue
+            cx, cy = b['position']
+            yaw = atan2(b['orientation'][1], b['orientation'][0])
+            poly = create_rotated_box(cx, cy, yaw)
+            detections.append({
+                'frame_id': frame_id,
+                'polygon': poly,
+                'score': score
+            })
 
         frame_id += 1
 
-    precision = total_tp / (total_tp + total_fp) if (total_tp + total_fp) > 0 else 0.0
-    recall = total_tp / (total_tp + total_fn) if (total_tp + total_fn) > 0 else 0.0
-    return precision, recall
+    return detections, gt_dict
 
+def compute_pr_curve(detections, gt_dict):
+    detections.sort(key=lambda x: -x['score'])
+    matched_gts = {fid: set() for fid in gt_dict}
+    tp, fp = 0, 0
+    precisions, recalls, f1s, thresholds = [], [], [], []
+    total_gt = sum(len(gts) for gts in gt_dict.values())
 
-def main():
-    pr_results = []
-    for t in tqdm(IOU_THRESHOLDS):
-        p, r = calculate_pr(t)
-        pr_results.append((t, p, r))
+    for det in detections:
+        frame_id = det['frame_id']
+        det_poly = det['polygon']
+        score = det['score']
+        gt_boxes = gt_dict.get(frame_id, [])
 
-    thresholds, precisions, recalls = zip(*pr_results)
+        best_iou, best_idx = 0, -1
+        for i, gt in enumerate(gt_boxes):
+            if i in matched_gts[frame_id]:
+                continue
+            iou = compute_iou(det_poly, gt)
+            if iou > best_iou:
+                best_iou = iou
+                best_idx = i
 
-    # === mAP 계산 (IoU 0.5~0.95 평균) ===
-    map_val = np.mean(precisions)
-    print(f"\n[Mean AP] mAP@[.50:.95] = {map_val:.3f}")
+        if best_iou >= IOU_THRESHOLD:
+            tp += 1
+            matched_gts[frame_id].add(best_idx)
+        else:
+            fp += 1
 
-    # === 그래프 출력 ===
+        fn = total_gt - tp
+        precision = tp / (tp + fp) if (tp + fp) else 0.0
+        recall = tp / total_gt if total_gt else 0.0
+        f1 = 2 * precision * recall / (precision + recall) if (precision + recall) else 0.0
+
+        precisions.append(precision)
+        recalls.append(recall)
+        f1s.append(f1)
+        thresholds.append(score)
+
+    return recalls, precisions, f1s, thresholds
+
+def draw_pr_curve(recalls, precisions, f1s, thresholds):
+    ap = np.trapz(precisions, recalls)
+    max_f1 = max(f1s)
+    best_idx = f1s.index(max_f1)
+    best_threshold = thresholds[best_idx]
+
+    best_recall = recalls[best_idx]
+    best_precision = precisions[best_idx]
+
+    # 저장
+    os.makedirs(os.path.dirname(OUTPUT_PNG), exist_ok=True)
     plt.figure(figsize=(8, 5))
-    plt.plot(thresholds, precisions, label='Precision', marker='o')
-    plt.plot(thresholds, recalls, label='Recall', marker='s')
-    plt.xlabel("IoU Threshold")
-    plt.ylabel("Metric")
-    plt.title("Precision and Recall vs IoU Threshold\n(mAP = {:.3f})".format(map_val))
+    plt.plot(recalls, precisions, label=f'PR Curve (AP={ap:.3f})', marker='o')
+
+    # 🔴 Max F1 점 찍기
+    plt.scatter([best_recall], [best_precision], color='red', label=f'Max F1 = {max_f1:.3f}', zorder=5)
+    plt.text(best_recall, best_precision + 0.01, f"F1={max_f1:.2f}", color='red', fontsize=10, ha='center')
+
+    plt.xlabel("Recall", fontsize = 16)
+    plt.ylabel("Precision", fontsize = 16)
+    plt.title("PointPillar PR Curve (IoU=0.5)")
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
-    plt.savefig('/home/mkj/lshape-ws/script/pr_vs_iou.png')
-    print("[Saved] /home/mkj/lshape-ws/script/pr_vs_iou.png")
+    plt.savefig(OUTPUT_PNG)
 
+    print(f"\n[✅ 완료] PR Curve 저장됨: {OUTPUT_PNG}")
+    print(f"[🎯 F1 최고점] Max F1 = {max_f1:.3f} at score threshold = {best_threshold:.3f}")
+    print(f"[📐 AP] Area under PR curve (AP) = {ap:.3f}")
 
-if __name__ == '__main__':
-    main()
+if __name__ == "__main__":
+    detections, gt_dict = load_data()
+    recalls, precisions, f1s, thresholds = compute_pr_curve(detections, gt_dict)
+    draw_pr_curve(recalls, precisions, f1s, thresholds)
