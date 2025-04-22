@@ -124,13 +124,13 @@ def draw_pr_curve(recalls, precisions, f1s, thresholds):
 
     # 🔴 Max F1 점 찍기
     plt.scatter([best_recall], [best_precision], color='red', label=f'Max F1 = {max_f1:.3f}', zorder=5)
-    plt.text(best_recall, best_precision + 0.01, f"F1={max_f1:.2f}", color='red', fontsize=10, ha='center')
+    plt.text(best_recall, best_precision + 0.01, f"F1={max_f1:.2f}", color='red', fontsize=12, ha='center')
 
     plt.xlabel("Recall", fontsize = 16)
     plt.ylabel("Precision", fontsize = 16)
-    plt.title("PointPillar PR Curve (IoU=0.5)")
+    plt.title("PointPillar PR Curve (IoU=0.5)", fontsize=20)
     plt.grid(True)
-    plt.legend()
+    plt.legend(fontsize=12)
     plt.tight_layout()
     plt.savefig(OUTPUT_PNG)
 

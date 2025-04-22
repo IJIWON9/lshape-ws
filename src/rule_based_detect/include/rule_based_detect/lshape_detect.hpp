@@ -164,7 +164,7 @@ public:
     clustercloud_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("/lshape_detect/clusterCloud", 10);
     contour_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("/lshape_detect/contour", 10);
     nongroundCloud_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("/lshape_detect/nongroundCloud", 10);
-    contourSegments_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("/lshape_detect/reflectedContour", 10);
+    contourSegments_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("/lshape_detect/rawContour", 10);
 
     outputContours_pub = this->create_publisher<custom_msgs::msg::Contours>("/lshape_detect/outputContours", 10);
 
@@ -190,7 +190,7 @@ public:
     // initialize pointclouds
     rawCloud.reset(new pcl::PointCloud<pcl::PointXYZ>());
     nongroundCloud.reset(new pcl::PointCloud<pcl::PointXYZI>());
-    reflectedContour.reset(new pcl::PointCloud<pcl::PointXYZ>());
+    rawContour.reset(new pcl::PointCloud<pcl::PointXYZ>());
     boundaryCloud.reset(new pcl::PointCloud<pcl::PointXYZ>());
 
     global_linkCloud_1.reset(new pcl::PointCloud<pcl::PointXYZ>());
@@ -357,7 +357,7 @@ public:
 
 
   std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> getContour(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clusterCloud_vector, std::vector<std::vector<double>>& dbscan_obj_list, 
-                                                                std::vector<std::vector<double>>& dist_angle_list);
+                                                                std::vector<std::vector<double>>& dist_angle_list, pcl::PointCloud<pcl::PointXYZ>::Ptr rawContour);
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr removeOutlier(pcl::PointCloud<pcl::PointXYZ>::Ptr obj_contour, 
                                                     std::vector<int>& contour_pt_idx,
@@ -431,7 +431,7 @@ public:
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr rawCloud;         
   pcl::PointCloud<pcl::PointXYZI>::Ptr nongroundCloud;
-  pcl::PointCloud<pcl::PointXYZ>::Ptr reflectedContour;
+  pcl::PointCloud<pcl::PointXYZ>::Ptr rawContour;
   pcl::PointCloud<pcl::PointXYZ>::Ptr boundaryCloud;
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr global_linkCloud_1;

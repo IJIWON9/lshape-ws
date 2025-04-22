@@ -12,7 +12,7 @@ import struct
 from datetime import datetime
 
 class ContourLabeler:
-    def __init__(self, save_dir="./labeled_dataset", class_names=None):
+    def __init__(self, save_dir="./labeled_dataset_for_evs", class_names=None):
         self.save_dir = save_dir
         os.makedirs(self.save_dir, exist_ok=True)
         self.class_names = class_names or ['Bumper', 'SidePanel', 'Unknown']
@@ -48,7 +48,7 @@ class ContourLabeler:
         self.ax.clear()
         x = np.linspace(0, 4.7, len(self.distance_array))
         self.ax.plot(x, self.distance_array, marker='o')
-        self.ax.set_ylim(-8, 8)
+        self.ax.set_ylim(-0.8, 0.8)
         idx = self.meta_info.get("contour_idx", -1)
         seg = self.meta_info.get("segment_idx", -1)
         remaining = self.total_segments - self.current_idx
@@ -89,7 +89,7 @@ class ContourProcessor(Node):
         self.bin_resolution = 0.05
         self.max_distance = 4.7
         self.ylim = 0.5
-        self.labeler = ContourLabeler(save_dir="./labeled_dataset")
+        self.labeler = ContourLabeler(save_dir="./labeled_dataset_for_evs")
         self.received_once = False
 
     def listener_callback(self, msg):
@@ -133,8 +133,8 @@ class ContourProcessor(Node):
             proj = np.dot(vec, unit_dir)
             range = np.hypot(pt[0], pt[1])
             dist_weight = 1 + 8 * range/100
-            dist = signed_distance_from_line_ab(p0, p1, pt) * dist_weight * 10
-            # dist = signed_distance_from_line_ab(p0, p1, pt)
+            # dist = signed_distance_from_line_ab(p0, p1, pt) * dist_weight * 10
+            dist = signed_distance_from_line_ab(p0, p1, pt)
             projections.append(proj)
             distances.append(dist)
 

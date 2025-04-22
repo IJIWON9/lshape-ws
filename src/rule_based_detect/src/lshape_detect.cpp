@@ -452,7 +452,7 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr LShapeDetect::getReflected(pcl::PointCloud<p
 }
 
 std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContour(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clusterCloud_vector, std::vector<std::vector<double>>& dbscan_obj_list, 
-                                                                            std::vector<std::vector<double>>& dist_angle_list)
+                                                                            std::vector<std::vector<double>>& dist_angle_list, pcl::PointCloud<pcl::PointXYZ>::Ptr rawContour)
 {
   std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> contourCloud_vector;
   std::vector<int> basement_noise_removal;
@@ -512,7 +512,20 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> LShapeDetect::getContour(std::v
       contour_point.z = dbscan_obj_list[c_idx][2];
       obj_contour->points.push_back(contour_point);
 
+      double dist = dist_angle_list.at(c_idx)[0];
+      double angle = dist_angle_list.at(c_idx)[1];
+
+      pcl::PointXYZ pp;        
+      pp.x = pt.x + dist * std::cos(angle);
+      pp.y = pt.y + dist * std::sin(angle);
+      pp.z = dbscan_obj_list[c_idx][2];
+
+      rawContour->points.push_back(pp);
+
+
       } 
+
+      
     }
     auto filtered = removeOutlierCurvatureBased(obj_contour, contour_pt_idx, min_angle, max_angle);
     // auto filtered = removeOutlier(obj_contour, contour_pt_idx, min_angle, max_angle);
@@ -592,14 +605,14 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
 
   auto clusterCloud_vector = getClusters(clusters, nonground_data);
   
+  rawContour -> clear(); 
   tc.start("getContour");
   auto dist_ang_list = pullClusters(clusterCloud_vector);
-  auto contourCloud_vector = getContour(clusterCloud_vector, dbscan_obj_list, dist_ang_list);
+  auto contourCloud_vector = getContour(clusterCloud_vector, dbscan_obj_list, dist_ang_list, rawContour);
 
   pushClusters(contourCloud_vector, dist_ang_list);
 
  
-  reflectedContour -> clear(); 
   std::vector<pcl::PointXYZ> line_pts; 
 
   custom_msgs::msg::Contours output_contours_msg;
@@ -608,15 +621,7 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
     auto contour = contourCloud_vector[i];
     auto contour_seg_vec = getContourSegments(contour, line_pts);
 
-    auto refl = getReflected(contour);
-
-    for (auto& pt : refl->points){
-      pcl::PointXYZ pp;
-      pp.x = pt.x;
-      pp.y = pt.y;
-      pp.z = pt.z;
-      reflectedContour->points.push_back(pp);
-    }
+    
 
     // std::ofstream file(filename.str(), std::ios::app);
     // file << "contour" << i+1;
@@ -639,19 +644,7 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
     }
     output_contours_msg.contours.push_back(contourSegments_msg);
 
-    // // visualize
-    // double i = 10.0;
-    // for (auto& contour_seg : contour_seg_vec){ 
-    //   for (auto& pt : contour_seg->points){
-    //     pcl::PointXYZI pp;
-    //     pp.x = pt.x;
-    //     pp.y = pt.y;
-    //     pp.z = pt.z;
-    //     pp.intensity = i;
-    //     reflectedContour->points.push_back(pp);
-    //   }
-    //   i += 50.0;
-    // }
+
   }
 
   outputContours_pub->publish(output_contours_msg);   //result
@@ -659,7 +652,7 @@ void LShapeDetect::pcd_sub_callback(const sensor_msgs::msg::PointCloud2::SharedP
 
    ////////// visualize //////////
   sensor_msgs::msg::PointCloud2 contourSegments_msg;
-  pcl::toROSMsg(*reflectedContour, contourSegments_msg);
+  pcl::toROSMsg(*rawContour, contourSegments_msg);
   contourSegments_msg.header.frame_id = FRAME_ID_LIDAR;
   contourSegments_msg.header.stamp = this->get_clock()->now();
   contourSegments_pub->publish(contourSegments_msg);
