@@ -158,9 +158,9 @@ class SVMInferenceNode(Node):
             direction = math.atan2(obj_orientations[i][1], obj_orientations[i][0])
             bbox = np.array([obj_positions[i][0], obj_positions[i][1], self.veh_z, self.veh_length, self.veh_width, self.veh_height, direction])
             detection_box.points = draw_box(bbox)
-            detection_box.color.r, detection_box.color.g, detection_box.color.b = float(0), float(0), float(1)
+            detection_box.color.r, detection_box.color.g, detection_box.color.b = float(0.8), float(0.8), float(0)
             detection_box.lifetime = Duration(sec=0, nanosec=int(0.5 * 1e9))
-            detection_box.color.a = float(1)
+            detection_box.color.a = float(0.2)
             detection_result.markers.append(detection_box)
                      
         self.bbox_vis_publisher.publish(detection_result)
@@ -195,12 +195,12 @@ class SVMInferenceNode(Node):
 
         marker.scale.x = 0.3  # shaft diameter
         marker.scale.y = 0.8  # head diameter
-        marker.scale.z = 0.5   # head length
+        marker.scale.z = 0.8   # head length
 
-        marker.color.a = 0.0
-        marker.color.r = 0.0
+        marker.color.a = 1.0
+        marker.color.r = 0.3
         marker.color.g = 0.8
-        marker.color.b = 0.8
+        marker.color.b = 0.0
 
         marker.lifetime = Duration(sec=0, nanosec=int(0.5 * 1e9))
 
